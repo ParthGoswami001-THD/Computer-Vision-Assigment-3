@@ -155,7 +155,7 @@ The parameter study stays inside the authors' method.
 | Initial scan lines | 4, 8 |
 | IEPS iterations | 2, 3 |
 | SCF stopping tolerance | 1, 2, 3 pixels |
-| SCF score | gradient only vs gradient / distance² |
+| SCF score | gradient only vs gradient / distance^2 |
 
 The aim is not to create a new algorithm, but to show which missing or weakly specified details affect reproducibility.
 
@@ -206,4 +206,3 @@ Expected limitations:
 ## 11. Final Contribution Statement
 
 This project contributes a reproducible traditional computer vision implementation of IEPS + SCF. It follows the authors' direction and documents the practical SCF rules that are necessary to make the algorithm executable: stopping tolerance, loop prevention, candidate tie-breaking, weak-gradient fallback, and max-step handling.
-

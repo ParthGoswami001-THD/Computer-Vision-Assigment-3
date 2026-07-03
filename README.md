@@ -19,12 +19,12 @@ The goal is to reproduce the paper's two-stage contour extraction method:
 
 ```text
 Input grayscale image
-→ Sobel gradient magnitude
-→ Center of gravity
-→ Initial Edge Point Selection (IEPS)
-→ Segmental Contour Following (SCF)
-→ Closed object contour
-→ Validation
+-> Sobel gradient magnitude
+-> Center of gravity
+-> Initial Edge Point Selection (IEPS)
+-> Segmental Contour Following (SCF)
+-> Closed object contour
+-> Validation
 ```
 
 The project also documents bugs, missing implementation details, and traditional-CV improvements discovered during reimplementation.
@@ -41,7 +41,7 @@ The project also documents bugs, missing implementation details, and traditional
 - Center of gravity using spatial moments
 - IEPS with scan lines and iterative refinement
 - SCF with related direction and 3-candidate operating mask
-- Gravity-inspired score: `gradient / distance²`
+- Gravity-inspired score: `gradient / distance^2`
 - Contour validation against ground truth
 - Runtime measurement
 
@@ -65,34 +65,34 @@ This baseline is included only for reference. It is not the main contribution.
 
 ```text
 cv_assignment3_ieps_scf/
-│
-├── main.py
-├── requirements.txt
-├── Doxyfile
-├── README.md
-│
-├── src/
-│   ├── image_generation.py
-│   ├── gradients.py
-│   ├── geometry.py
-│   ├── ieps.py
-│   ├── scf.py
-│   ├── baseline.py
-│   ├── evaluation.py
-│   └── visualization.py
-│
-├── docs/
-│   ├── FINAL_PLAN.md
-│   ├── RESEARCH_REPORT.md
-│   ├── FULL_IMPLEMENTATION_BUG_FIX_REPORT.md
-│   └── DOXYGEN_STYLE.md
-│
-└── results/
-    ├── circle_clean/
-    ├── circle_noisy/
-    ├── u_shape_clean/
-    ├── u_shape_noisy/
-    └── tables/
+|
++-- main.py
++-- requirements.txt
++-- Doxyfile
++-- README.md
+|
++-- src/
+|   +-- image_generation.py
+|   +-- gradients.py
+|   +-- geometry.py
+|   +-- ieps.py
+|   +-- scf.py
+|   +-- baseline.py
+|   +-- evaluation.py
+|   +-- visualization.py
+|
++-- docs/
+|   +-- FINAL_PLAN.md
+|   +-- RESEARCH_REPORT.md
+|   +-- FULL_IMPLEMENTATION_BUG_FIX_REPORT.md
+|   +-- DOXYGEN_STYLE.md
+|
++-- results/
+    +-- circle_clean/
+    +-- circle_noisy/
+    +-- u_shape_clean/
+    +-- u_shape_noisy/
+    +-- tables/
 ```
 
 ---

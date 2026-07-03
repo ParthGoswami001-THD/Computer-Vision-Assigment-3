@@ -1,5 +1,4 @@
-# Research Report
-## Reimplementation and Validation of IEPS + SCF for Object Contour Extraction
+# Reimplementation and Validation of IEPS + SCF for Object Contour Extraction: A Traditional Computer Vision Reproducibility Study
 
 **Course:** Computer Vision Assignment 3  
 **Assigned paper:** Roy Chaoming Hsu, Ping-Wen Kao, Wei-Jie Lai, Cheng-Ting Liu, *An Initial Edge Point Selection and Segmental Contour Following for Object Contour Extraction*, IEEE ICARCV 2010.
@@ -71,7 +70,7 @@ For each pair of neighboring initial points, SCF:
 
 ## 4. Final Research Question
 
-> Can the IEPS + SCF method proposed by Hsu et al. be reimplemented from the paper description and validated on author-style synthetic circle and U-shape images, including noisy cases, while identifying the missing implementation details needed to reproduce the contour-following behavior?
+> Can the IEPS + SCF method proposed by Hsu et al. be reimplemented from the paper description and validated on author-style synthetic circle and U-shape images, including noisy cases, while identifying which missing implementation parameters are necessary to reproduce the reported behavior?
 
 ---
 
@@ -90,9 +89,22 @@ The final direction follows the authors' particular approach rather than adding 
 
 ## 6. Key Reproducibility Finding
 
-The most important under-specified part of the paper is the practical SCF contour-following logic.
+The main research finding is that the paper's high-level IEPS + SCF idea is reproducible, but several implementation parameters are under-specified. These details are necessary to turn the paper description into executable code and to interpret why results differ across circle, U-shape, clean, and noisy cases.
 
-The paper describes the general idea of related direction, local operating masks, and gravity-like force, but it does not fully define several details needed for reliable code:
+| Under-specified detail | Why it matters | Implementation decision in this project |
+|---|---|---|
+| Exact scan-line sampling method | Different discretizations select different edge pixels. | Use integer ray sampling from the center and finite normal-line sampling through midpoints. |
+| Sobel threshold tuning | The paper reports threshold 64, but this does not generalize automatically. | Default threshold is 64; parameter study tests 40, 64, and 90. |
+| Gaussian noise generation | Noise results depend on sigma and random seed. | Use reproducible Gaussian noise with fixed seeds; parameter study tests clean, low noise, and paper-like noisy cases. |
+| True-positive tolerance | Pixel-perfect matching is unfair for edge bands. | IEPS and contour metrics use a default 2-pixel tolerance. |
+| SCF stopping rule | "Closed contour" is not enough for code. | Stop a segment when it is within tolerance of the target point. |
+| Candidate tie-breaking | Multiple pixels can have similar gradient scores. | Prefer highest score, then highest gradient, then shortest target distance. |
+| Loop avoidance | Greedy contour following can revisit pixels. | Maintain a visited-pixel set per segment. |
+| Missing edge point on a scan line | Noisy or weak edges may fail the threshold. | Keep a configurable fallback; default selects the maximum-gradient point. |
+| Coordinate convention | The paper uses x/y; OpenCV arrays use row/column. | Public geometry functions use (x, y), with array reads as image[y, x]. |
+| Normal scan-line discretization | The midpoint/normal equation is mathematical, not pixel-ready. | Sample finite integer lines with a decreasing radius each refinement iteration. |
+
+The most important under-specified part is still the practical SCF contour-following logic. The paper describes related direction, local operating masks, and gravity-like force, but it does not fully define these SCF rules:
 
 | Under-specified SCF detail | Implementation decision in this project |
 |---|---|
@@ -156,6 +168,7 @@ The parameter study stays inside the authors' method.
 | IEPS iterations | 2, 3 |
 | SCF stopping tolerance | 1, 2, 3 pixels |
 | SCF score | gradient only vs gradient / distance^2 |
+| Noise level | clean, low noise, paper-like noisy |
 
 The aim is not to create a new algorithm, but to show which missing or weakly specified details affect reproducibility.
 

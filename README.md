@@ -1,4 +1,4 @@
-# IEPS + SCF Object Contour Extraction
+# Reimplementation and Validation of IEPS + SCF for Object Contour Extraction: A Traditional Computer Vision Reproducibility Study
 
 ## Computer Vision Assignment 3
 
@@ -282,7 +282,9 @@ docs/doxygen/html/
 
 ## 11. Recommended Presentation Message
 
-> I implemented the authors' IEPS + SCF method as a traditional computer vision pipeline. During reproduction, the main challenge was not Sobel or center of gravity, but the missing practical details in SCF: stopping tolerance, loop prevention, tie-breaking, weak-gradient fallback, and contour-point ordering. These choices strongly affect contour closure, especially for concave U-shapes. I also tested traditional CV fixes such as contrast-based moments, robust interior IEPS seeding, denser scan-line coverage, graph-search contour following, and band-limited curvature-aware SCF.
+> After the discussion with the professor, I focused the work on the authors' original direction: reimplementing and validating IEPS + SCF. Instead of adding unrelated preprocessing or large external methods, I investigated the parameters and implementation choices that are necessary to reproduce the paper's contour extraction behavior.
+
+The detailed research finding is that the main challenge was not Sobel or center of gravity alone, but the missing practical details in IEPS/SCF: scan-line sampling, threshold tuning, noise generation, stopping tolerance, loop prevention, tie-breaking, missing-edge fallback, coordinate convention, normal-line discretization, and contour-point ordering.
 
 ---
 

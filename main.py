@@ -307,7 +307,9 @@ def run_parameter_study() -> pd.DataFrame:
     @return Parameter study DataFrame.
     """
     rows: List[Dict[str, float | str | int]] = []
-    image, _mask, contour = _prepare_cases()["u_shape_noisy"]
+    cases = _prepare_cases()
+    clean_image, _clean_mask, clean_contour = cases["u_shape_clean"]
+    image, _mask, contour = cases["u_shape_noisy"]
 
     for threshold in [40.0, 64.0, 90.0]:
         rows.append(run_single_case(f"param_threshold_{int(threshold)}", image, contour, threshold=threshold, save_outputs=False))
@@ -317,6 +319,25 @@ def run_parameter_study() -> pd.DataFrame:
         rows.append(run_single_case(f"param_iterations_{iterations}", image, contour, iterations=iterations, save_outputs=False))
     for tolerance in [1.0, 2.0, 3.0]:
         rows.append(run_single_case(f"param_scf_tol_{int(tolerance)}", image, contour, scf_tolerance=tolerance, save_outputs=False))
+    for score_mode in ["gradient_only", "gradient_distance2"]:
+        rows.append(run_single_case(
+            f"param_scf_score_{score_mode}",
+            image,
+            contour,
+            scf_score_mode=score_mode,
+            save_outputs=False,
+        ))
+    for noise_name, noise_image in [
+        ("clean", clean_image),
+        ("low_noise_sigma10", add_gaussian_noise(clean_image, sigma=10, seed=11)),
+        ("paperlike_noise_sigma20", add_gaussian_noise(clean_image, sigma=20, seed=9)),
+    ]:
+        rows.append(run_single_case(
+            f"param_noise_{noise_name}",
+            noise_image,
+            clean_contour,
+            save_outputs=False,
+        ))
     return pd.DataFrame(rows)
 
 

@@ -1,234 +1,165 @@
 # Reimplementation and Validation of IEPS + SCF for Object Contour Extraction: A Traditional Computer Vision Reproducibility Study
 
 **Course:** Computer Vision Assignment 3  
-**Assigned paper:** Roy Chaoming Hsu, Ping-Wen Kao, Wei-Jie Lai, Cheng-Ting Liu, *An Initial Edge Point Selection and Segmental Contour Following for Object Contour Extraction*, IEEE ICARCV 2010.
+**Paper:** Roy Chaoming Hsu, Ping-Wen Kao, Wei-Jie Lai, Cheng-Ting Liu, *An Initial Edge Point Selection and Segmental Contour Following for Object Contour Extraction*, ICARCV 2010.
 
----
-
-## 1. Assignment Alignment
-
-The assignment requires an individual research question based on a scientific workshop or conference paper. The main goal is to understand and reimplement the paper's main scientific contribution, validate its results, and potentially propose a focused extension. The implementation should use Python with NumPy and OpenCV, with hand-coded algorithmic parts preferred.
-
-This project therefore focuses on a traditional computer vision reimplementation of the paper's proposed method:
-
-1. **Initial Edge Point Selection (IEPS)**
-2. **Segmental Contour Following (SCF)**
-
-The project does not treat deep learning, full Snake implementation, full Chen implementation, or general segmentation as the main contribution.
-
----
-
-## 2. Original Paper Problem
-
-Contour extraction is a classical image segmentation problem. The objective is to identify the boundary of an object in an image. Edge-based operators such as Sobel are efficient but do not guarantee a closed contour. Active contour models such as Snake can generate closed contours, but they usually require manual initialization and higher computation.
-
-The paper's research question can be stated as:
-
-> How can an object contour be extracted automatically and efficiently without manually selecting initial contour points, while still producing an accurate closed contour?
-
----
-
-## 3. Main Contribution of the Paper
-
-The paper proposes a two-stage traditional computer vision method.
-
-### 3.1 Initial Edge Point Selection (IEPS)
-
-IEPS automatically selects initial edge points around an object.
-
-The method uses:
-
-- grayscale image intensity,
-- image moments / center of gravity,
-- radial scan lines,
-- Sobel gradient magnitude,
-- threshold-based edge candidate selection,
-- iterative scan-line refinement between neighboring points.
-
-Author-style experimental parameters reported in the paper:
-
-- 4 initial scan lines,
-- 3 refinement iterations,
-- approximately 32 initial edge points,
-- Sobel threshold around 64.
-
-### 3.2 Segmental Contour Following (SCF)
-
-SCF connects neighboring IEPS points into a closed contour.
-
-For each pair of neighboring initial points, SCF:
-
-1. treats one point as the current origin and the next as the target,
-2. computes the related direction,
-3. selects a local directional mask,
-4. evaluates candidate pixels using gradient magnitude and a gravity-like distance term,
-5. moves to the best candidate,
-6. repeats until the target is reached,
-7. links all segments to form the object contour.
-
----
-
-## 4. Final Research Question
+## Research Question
 
 > Can the IEPS + SCF method proposed by Hsu et al. be reimplemented from the paper description and validated on author-style synthetic circle and U-shape images, including noisy cases, while identifying which missing implementation parameters are necessary to reproduce the reported behavior?
 
----
+This question became the center of the project after the professor discussion. Instead of making Canny, preprocessing, or deep learning the main story, I focused on whether the authors' own method can be reproduced carefully from the paper.
 
-## 5. Research Direction After Professor Discussion
+## What The Paper Is Trying To Solve
 
-The final direction follows the authors' particular approach rather than adding unrelated preprocessing or modern deep learning. The priority is:
+The paper deals with object contour extraction. A simple edge detector such as Sobel can find strong intensity changes, but it does not automatically give a clean closed contour. Active contour methods can close contours, but they often need manual initialization.
 
-1. Reimplement IEPS + SCF.
-2. Validate author-style results on synthetic clean/noisy images.
-3. Investigate missing implementation details inside IEPS/SCF.
-4. Run a focused parameter study.
-5. Keep Canny/OpenCV as a small secondary baseline only.
-6. Mention U-Net only as future work.
+Hsu et al. try to solve this by combining two steps:
 
----
+1. **IEPS: Initial Edge Point Selection**  
+   Choose a small set of useful boundary points automatically.
 
-## 6. Key Reproducibility Finding
+2. **SCF: Segmental Contour Following**  
+   Connect those points segment by segment until a full contour is formed.
 
-The main research finding is that the paper's high-level IEPS + SCF idea is reproducible, but several implementation parameters are under-specified. These details are necessary to turn the paper description into executable code and to interpret why results differ across circle, U-shape, clean, and noisy cases.
+The idea is attractive because it keeps the method classical and lightweight. The hard part is that the paper leaves some practical implementation details open.
 
-| Under-specified detail | Why it matters | Implementation decision in this project |
-|---|---|---|
-| Exact scan-line sampling method | Different discretizations select different edge pixels. | Use integer ray sampling from the center and finite normal-line sampling through midpoints. |
-| Sobel threshold tuning | The paper reports threshold 64, but this does not generalize automatically. | Default threshold is 64; parameter study tests 40, 64, and 90. |
-| Gaussian noise generation | Noise results depend on sigma and random seed. | Use reproducible Gaussian noise with fixed seeds; parameter study tests clean, low noise, and paper-like noisy cases. |
-| True-positive tolerance | Pixel-perfect matching is unfair for edge bands. | IEPS and contour metrics use a default 2-pixel tolerance. |
-| SCF stopping rule | "Closed contour" is not enough for code. | Stop a segment when it is within tolerance of the target point. |
-| Candidate tie-breaking | Multiple pixels can have similar gradient scores. | Prefer highest score, then highest gradient, then shortest target distance. |
-| Loop avoidance | Greedy contour following can revisit pixels. | Maintain a visited-pixel set per segment. |
-| Missing edge point on a scan line | Noisy or weak edges may fail the threshold. | Keep a configurable fallback; default selects the maximum-gradient point. |
-| Coordinate convention | The paper uses x/y; OpenCV arrays use row/column. | Public geometry functions use (x, y), with array reads as image[y, x]. |
-| Normal scan-line discretization | The midpoint/normal equation is mathematical, not pixel-ready. | Sample finite integer lines with a decreasing radius each refinement iteration. |
+## Reimplemented Pipeline
 
-The most important under-specified part is still the practical SCF contour-following logic. The paper describes related direction, local operating masks, and gravity-like force, but it does not fully define these SCF rules:
+The implemented pipeline is:
 
-| Under-specified SCF detail | Implementation decision in this project |
+```text
+input image
+-> Sobel gradient magnitude
+-> center of gravity
+-> IEPS scan-line point selection
+-> SCF segment tracing
+-> predicted contour
+-> evaluation against ground truth
+```
+
+The default paper-style configuration is:
+
+| Component | Default used here |
 |---|---|
-| When does a segment stop? | Stop when distance to target is less than or equal to a tolerance. Default: 2 pixels. |
-| How to avoid loops? | Maintain a visited-pixel set per segment. |
-| What if no candidate has strong gradient? | Use closest-to-target fallback. |
-| How are ties handled? | Prefer highest score, then highest gradient, then shortest distance to target. |
-| How many steps are allowed? | Maximum steps = 3 times the distance between segment endpoints. |
-| How are image borders handled? | Ignore out-of-image candidates. |
-| What defines a closed contour? | All neighboring IEPS points are connected, including the last point back to the first. |
+| Initial scan lines | 4 |
+| IEPS refinement iterations | 3 |
+| Sobel threshold | 64 |
+| Final IEPS point count | about 32 |
+| SCF stop tolerance | 2 pixels |
+| SCF score | gradient / distance-to-target squared |
 
-This is the main reproducibility contribution of this implementation.
+The main implementation is in `src/ieps.py` and `src/scf.py`. The improved IEPS extension is kept separate in `src/ieps_improved.py` so the paper-faithful version is still easy to identify.
 
----
+## Validation Data
 
-## 7. Validation Design
-
-### 7.1 Author-Style Test Images
-
-The project validates the method on:
+I used synthetic images similar to the author-style examples:
 
 - clean circle,
 - noisy circle,
 - clean U-shape,
 - noisy U-shape.
 
-Each synthetic image has:
+Each case has an input image, a binary object mask, and a ground-truth contour mask. Gaussian noise is generated with fixed seeds so the results are reproducible.
 
-- input grayscale image,
-- binary object mask,
-- ground-truth contour mask.
+## Evaluation Metrics
 
-### 7.2 Main Metrics
+The method is evaluated at two levels:
 
-| Metric | Purpose |
+| Metric | Why it is needed |
 |---|---|
-| IEPS point accuracy | Measures whether selected initial edge points lie near the true contour. |
-| Neighbor mean distance | Measures average spacing between IEPS points. |
-| Neighbor distance standard deviation | Measures evenness of IEPS point distribution. |
-| Contour precision | Measures how many predicted contour pixels are correct. |
-| Contour recall | Measures how much true contour is recovered. |
-| F1 score | Balances precision and recall. |
-| Runtime | Validates the low-complexity claim. |
+| IEPS point accuracy | Checks whether the selected initial points are near the true contour. |
+| Neighbor distance mean/std | Shows whether IEPS points are evenly spaced. |
+| Contour precision | Measures how much of the predicted contour lies near ground truth. |
+| Contour recall | Measures how much of the ground-truth contour is recovered. |
+| F1 score | Summarizes precision and recall. |
+| Runtime | Checks the practical cost of IEPS and SCF. |
 
-### 7.3 Tolerance-Based Evaluation
+Both IEPS points and contour pixels are evaluated with a small tolerance. This is important because gradient responses and contour masks do not always land on exactly the same pixel.
 
-A predicted point is considered correct if it lies within a small pixel tolerance of the ground-truth contour. Default tolerance: 2 pixels.
+## Main Reproducibility Finding
 
-This is necessary because the paper reports true-positive ratios but does not fully specify the exact pixel tolerance.
+The paper's overall idea is clear, but the implementation is not fully specified. During reimplementation, I had to make several choices that directly changed the results.
 
----
+| Under-specified detail | Why it matters | Decision used in this implementation |
+|---|---|---|
+| Scan-line sampling | Pixel discretization changes which edge point is selected. | Integer rays from the center and finite normal lines through midpoints. |
+| Threshold tuning | The paper mentions 64, but not how to adapt it. | Use 64 as default and test 40, 64, 90. |
+| Gaussian noise | Noise results depend on sigma and random seed. | Fixed seeds, with clean, low-noise, and paper-like noisy tests. |
+| True-positive tolerance | Pixel-perfect evaluation is too strict for edge bands. | Default tolerance is 2 pixels. |
+| SCF stopping rule | "Reach the next point" needs a code-level definition. | Stop when distance to target is within tolerance. |
+| Candidate tie-breaking | Several neighboring pixels can have similar scores. | Prefer score, then gradient, then target distance. |
+| Loop handling | Greedy following can revisit pixels. | Keep a visited set for each segment. |
+| Missing scan-line edge | Some lines have no pixel above threshold. | Use a configurable fallback; default is max-gradient point. |
+| Coordinate convention | Paper uses `(x, y)`; OpenCV arrays use `[y, x]`. | Public geometry uses `(x, y)` and converts only when indexing arrays. |
+| Normal-line discretization | The paper gives the math, not exact pixels. | Sample a finite integer line with decreasing radius each iteration. |
 
-## 8. Focused Parameter Study
+The SCF part was the most sensitive. Without explicit stopping, loop prevention, tie-breaking, and fallback rules, the contour follower is easy to make unstable.
 
-The parameter study stays inside the authors' method.
+## Results Summary
 
-| Parameter | Values |
+The current full run writes detailed values to `results/tables/main_results.csv`. The high-level behavior is:
+
+- Circle cases are handled very well by the paper-style method.
+- U-shape cases are harder because concavity breaks some assumptions behind center-based scan lines and local contour following.
+- The Canny baseline is useful as a reference, but it is not the research focus.
+
+Representative values from the current run:
+
+| Case | Method | F1 |
+|---|---|---|
+| circle_clean | paper IEPS + greedy SCF | 1.0000 |
+| circle_noisy | paper IEPS + greedy SCF | 1.0000 |
+| u_shape_clean | paper IEPS + greedy SCF | 0.6135 |
+| u_shape_noisy | paper IEPS + greedy SCF | 0.5908 |
+| u_shape_noisy | graph SCF | 0.6114 |
+| u_shape_noisy | band-graph SCF | 0.6122 |
+
+The improved IEPS extension gives the clearest practical improvement on concave shapes:
+
+| Case | Paper IEPS F1 | Improved IEPS F1 |
+|---|---:|---:|
+| circle_clean | 1.0000 | 1.0000 |
+| circle_noisy | 1.0000 | 1.0000 |
+| u_shape_clean | 0.6135 | 0.7004 |
+| u_shape_noisy | 0.5908 | 0.6965 |
+
+This supports the main interpretation: the original IEPS idea is strong on simple star-convex shapes, but concave shapes need more careful seeding and coverage.
+
+## Parameter Study
+
+The parameter study stays inside IEPS and SCF rather than adding unrelated algorithms.
+
+| Parameter | Values tested |
 |---|---|
 | Sobel threshold | 40, 64, 90 |
 | Initial scan lines | 4, 8 |
 | IEPS iterations | 2, 3 |
 | SCF stopping tolerance | 1, 2, 3 pixels |
-| SCF score | gradient only vs gradient / distance^2 |
+| SCF score | gradient only, gradient / distance^2 |
 | Noise level | clean, low noise, paper-like noisy |
 
-The aim is not to create a new algorithm, but to show which missing or weakly specified details affect reproducibility.
+This is important because it turns the paper's missing details into measurable choices instead of hidden assumptions.
 
----
+## Extension Kept Inside The Paper Direction
 
-## 9. Comparison Strategy
+I added two traditional computer vision extensions, but kept them secondary to the paper reproduction.
 
-### Main Method
+**Improved IEPS**  
+The paper assumes that the center of gravity is a good place to emit scan lines. This can fail on concave U-shapes because the center may fall in the background notch. The improved version checks an Otsu silhouette and, if needed, moves the seed to the maximum of the distance transform. It also uses denser rays and fills large angular gaps.
 
-- IEPS + SCF
+**Band-limited graph SCF**  
+The paper-style greedy SCF is fast but local. The graph version treats the Sobel image as a cost map. The band-limited version adds a corridor around the current IEPS segment and a curvature penalty, which helps reduce wandering and zig-zagging. It is slower, so I would present it as an extension rather than the default method.
 
-### Traditional-CV Extension
+## Limitations
 
-- Improved IEPS + SCF
-- Band-limited curvature-aware graph SCF
+The current implementation is intentionally small and controlled. It assumes one dominant object, strong object/background contrast, and simple synthetic shapes. The U-shape already shows that concave objects are much harder than circles. More realistic images would need more robust thresholding, ordering, and stopping checks.
 
-The improved IEPS mode keeps the authors' initialization direction but replaces a fragile center assumption with a robust interior seed. If the center of gravity lies outside the Otsu object silhouette, the seed is relocated to the distance-transform maximum. The method also uses denser scan-line coverage and boundary-style point ordering for concave objects.
+## Final Contribution
 
-The band-limited curvature-aware graph SCF keeps the SCF segment idea but replaces local greedy movement with A* search over an edge-cost map. The cost combines weak-gradient penalty, distance from the IEPS segment corridor, and curvature penalty. This is used as an improved traditional-CV contour-following method, not as the paper-faithful baseline.
+The project reimplements the IEPS + SCF method and validates it on clean/noisy circle and U-shape cases. The main finding is that the method is reproducible on simple shapes, but exact behavior depends on implementation details that the paper does not fully specify.
 
-### Secondary Baseline
+The strongest research point is this:
 
-- Canny + OpenCV `findContours`
+> During reimplementation, I found that some practical details are under-specified, so I documented my assumptions and tested their effect using parameter runs.
 
-The baseline is included only as a reference. It is not the main contribution.
-
-### Optional Future Work
-
-- IEPS + Snake comparison,
-- full Chen method comparison,
-- U-Net-based segmentation comparison,
-- multiple-object extension,
-- larger real image dataset.
-
----
-
-## 10. Expected Results
-
-Expected successful behavior:
-
-1. IEPS should select points close to the boundary for centered circle and U-shape objects.
-2. 4 scan lines and 3 iterations should create approximately 32 edge points.
-3. SCF should connect neighboring IEPS points into a mostly closed contour.
-4. Noise should reduce accuracy but not necessarily destroy the method.
-5. SCF stopping tolerance and tie-breaking should strongly affect contour closure.
-
-Expected limitations:
-
-1. Heavy noise may create false Sobel gradients.
-2. Weak object/background contrast may reduce IEPS reliability.
-3. Multiple objects are not handled.
-4. Off-center objects may affect center-of-gravity based scan lines.
-5. SCF depends on implementation details not fully specified in the paper.
-
----
-
-## 11. Final Contribution Statement
-
-This project contributes a reproducible traditional computer vision implementation of IEPS + SCF. It follows the authors' direction and documents the practical SCF rules that are necessary to make the algorithm executable: stopping tolerance, loop prevention, candidate tie-breaking, weak-gradient fallback, and max-step handling.
-
-It also identifies a deeper IEPS limitation: the paper's IEPS assumes the center of gravity lies inside a star-convex object. This fails on concave U-shapes. A traditional CV fix using an interior distance-transform seed and denser scan-line coverage improves U-shape performance while preserving circle performance.
-
-For SCF, the project adds a second extension: band-limited curvature-aware graph search. This addresses the paper-style greedy mask's tendency to make local mistakes, wander on noisy gradients, or zig-zag around corners.
+That keeps the project aligned with the authors' method while still adding a clear research contribution.

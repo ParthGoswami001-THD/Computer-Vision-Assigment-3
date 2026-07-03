@@ -1,160 +1,130 @@
-# Reimplementation and Validation of IEPS + SCF for Object Contour Extraction: A Traditional Computer Vision Reproducibility Study
+# Reimplementation and Validation of IEPS + SCF for Object Contour Extraction
 
-## Computer Vision Assignment 3
-
-This repository contains a traditional computer vision reimplementation of the paper:
-
-**An Initial Edge Point Selection and Segmental Contour Following for Object Contour Extraction**  
+Computer Vision Assignment 3  
+Paper: **An Initial Edge Point Selection and Segmental Contour Following for Object Contour Extraction**  
 Roy Chaoming Hsu, Ping-Wen Kao, Wei-Jie Lai, Cheng-Ting Liu, ICARCV 2010.
 
-The project follows the professor-aligned direction:
+This repository is a reproducibility-focused implementation of the paper's IEPS + SCF contour extraction method. After the discussion with the professor, I kept the work centered on the authors' original idea instead of turning the assignment into a broad Canny, preprocessing, or deep-learning comparison.
 
-> Reimplement and validate the authors' IEPS + SCF method first. Extensions must stay inside the authors' traditional computer vision direction.
+The final research question is:
 
----
+> Can the IEPS + SCF method proposed by Hsu et al. be reimplemented from the paper description and validated on author-style synthetic circle and U-shape images, including noisy cases, while identifying which missing implementation parameters are necessary to reproduce the reported behavior?
 
-## 1. Project Goal
+## What The Code Does
 
-The goal is to reproduce the paper's two-stage contour extraction method:
+The main pipeline is:
 
 ```text
-Input grayscale image
+grayscale image
 -> Sobel gradient magnitude
--> Center of gravity
+-> center of gravity
 -> Initial Edge Point Selection (IEPS)
 -> Segmental Contour Following (SCF)
--> Closed object contour
--> Validation
+-> contour mask
+-> validation against ground truth
 ```
 
-The project also documents bugs, missing implementation details, and traditional-CV improvements discovered during reimplementation.
+The paper-faithful setup uses the same direction as the authors:
 
----
+- synthetic circle and U-shape images,
+- clean and Gaussian-noisy versions,
+- Sobel gradient magnitude for edge evidence,
+- center of gravity from image moments,
+- IEPS with 4 initial scan lines,
+- 3 IEPS refinement iterations,
+- Sobel threshold around 64,
+- about 32 selected initial edge points,
+- SCF between neighboring IEPS points,
+- a gradient/distance-style candidate score,
+- contour evaluation against ground-truth masks.
 
-## 2. What Is Implemented
+Canny + OpenCV contours are included only as a small reference baseline. They are not the main topic of the project.
 
-### Main paper implementation
+## Why This Became A Reproducibility Study
 
-- Synthetic circle and U-shape images
-- Gaussian noisy test images
-- Sobel gradient magnitude
-- Center of gravity using spatial moments
-- IEPS with scan lines and iterative refinement
-- SCF with related direction and 3-candidate operating mask
-- Gravity-inspired score: `gradient / distance^2`
-- Contour validation against ground truth
-- Runtime measurement
+The paper gives the overall IEPS + SCF idea clearly, but several details are not specific enough to implement directly. Those choices matter more than I expected, especially for the U-shape.
 
-### Debugging and reproducibility study
+The main missing or under-specified details I had to make explicit were:
 
-- Center-of-gravity modes: `raw`, `contrast`, `binary`
-- IEPS order modes: `topological`, `angle`
-- IEPS refinement selection modes: `farthest_from_center`, `max_gradient`, `closest_to_reference`
-- Optional improved IEPS mode with robust interior seed and denser scan lines
-- SCF score modes: `gradient_distance2`, `gradient_only`
-- Optional graph-search SCF as a traditional-CV improvement
-- Optional band-limited curvature-aware graph SCF
+- how scan lines are discretized into pixels,
+- how the Sobel threshold should be chosen,
+- how Gaussian noise is generated,
+- what pixel tolerance counts as a true positive,
+- when an SCF segment should stop,
+- how candidate ties are broken,
+- how loops are avoided,
+- what to do when no scan-line point passes the threshold,
+- how to handle `(x, y)` paper coordinates versus OpenCV `image[y, x]`,
+- how midpoint normal scan lines should be sampled.
 
-### Secondary baseline
+That is the main research contribution here: not just re-running Sobel, but documenting the practical assumptions needed to make IEPS + SCF executable.
 
-- Canny + OpenCV contour extraction baseline
+## Implemented Experiments
 
-This baseline is included only for reference. It is not the main contribution.
+The full run generates four required author-style cases:
 
----
+- `circle_clean`
+- `circle_noisy`
+- `u_shape_clean`
+- `u_shape_noisy`
 
-## 3. Repository Structure
+It also runs:
 
-```text
-cv_assignment3_ieps_scf/
-|
-+-- main.py
-+-- requirements.txt
-+-- Doxyfile
-+-- README.md
-|
-+-- src/
-|   +-- image_generation.py
-|   +-- gradients.py
-|   +-- geometry.py
-|   +-- ieps.py
-|   +-- ieps_improved.py
-|   +-- scf.py
-|   +-- baseline.py
-|   +-- evaluation.py
-|   +-- visualization.py
-|
-+-- docs/
-|   +-- FINAL_PLAN.md
-|   +-- RESEARCH_REPORT.md
-|   +-- FULL_IMPLEMENTATION_BUG_FIX_REPORT.md
-|   +-- DOXYGEN_STYLE.md
-|
-+-- results/
-    +-- circle_clean/
-    +-- circle_noisy/
-    +-- u_shape_clean/
-    +-- u_shape_noisy/
-    +-- tables/
-```
+- the paper-style greedy SCF,
+- graph-search SCF as a traditional-CV extension,
+- band-limited curvature-aware graph SCF,
+- an improved IEPS mode for concave objects,
+- a bug/fix study,
+- a focused parameter study,
+- the Canny/OpenCV secondary baseline.
 
----
+The parameter study stays inside IEPS and SCF:
 
-## 4. Installation
+- Sobel threshold: `40`, `64`, `90`
+- initial scan lines: `4`, `8`
+- IEPS iterations: `2`, `3`
+- SCF stopping tolerance: `1`, `2`, `3` pixels
+- SCF score: `gradient_only` vs `gradient_distance2`
+- noise level: clean, low noise, paper-like noisy
 
-Create a virtual environment and install dependencies:
+## Results In Short
+
+The circle cases reproduce well. The paper-style IEPS + greedy SCF reaches perfect F1 on the clean and noisy circle images in the current synthetic setup.
+
+The U-shape is the more interesting case. It exposes two problems that are easy to miss from the paper description:
+
+1. The center of gravity can be a weak seed for concave shapes.
+2. Neighboring points in an IEPS list are not always neighboring points on the real contour.
+
+The improved IEPS extension handles that by using an interior distance-transform seed and denser scan-line coverage. On the current generated results, it improves U-shape performance while preserving circle performance.
+
+The band-limited graph SCF is more robust than the local greedy idea in some noisy cases, but it is much slower. I would present it as an extension, not as the default method.
+
+## Running The Project
+
+Create and activate a virtual environment, then install the dependencies:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate      # Linux/macOS
-# .venv\Scripts\activate       # Windows
+python -m venv assignment-3
+assignment-3\Scripts\activate
 pip install -r requirements.txt
 ```
 
----
-
-## 5. Run the Full Project
-
-From the repository root:
+Run everything from the repository root:
 
 ```bash
 python main.py
 ```
 
-The script will:
+In this workspace I used:
 
-1. Generate author-style test images.
-2. Run IEPS.
-3. Run paper-style greedy SCF.
-4. Run graph-search SCF as a traditional-CV improvement.
-5. Run band-limited curvature-aware graph SCF as a stronger traditional-CV improvement.
-6. Run Canny baseline.
-7. Run bug/fix study.
-8. Run improved-IEPS comparison.
-9. Run parameter study.
-10. Save images and CSV tables.
-
----
-
-## 6. Output Files
-
-Main result images:
-
-```text
-results/circle_clean/panel_greedy.png
-results/circle_noisy/panel_greedy.png
-results/u_shape_clean/panel_greedy.png
-results/u_shape_noisy/panel_greedy.png
+```bash
+.\assignment-3\Scripts\python.exe main.py
 ```
 
-Improved graph-SCF panels:
+## Output Files
 
-```text
-results/<case>/panel_graph.png
-results/<case>/panel_band_graph.png
-```
-
-CSV tables:
+Main CSV tables:
 
 ```text
 results/tables/main_results.csv
@@ -163,152 +133,55 @@ results/tables/parameter_study.csv
 results/tables/improvement_comparison.csv
 ```
 
----
-
-## 7. Important Reproducibility Finding
-
-The most important under-specified part of the conference paper is the practical SCF implementation.
-
-The paper explains:
-
-- related direction,
-- operating masks,
-- gravity-like force,
-- closed contour decision,
-
-but it does not fully specify:
-
-- stopping tolerance,
-- loop prevention,
-- candidate tie-breaking,
-- weak-gradient fallback,
-- maximum segment steps,
-- border handling,
-- contour-point ordering for concave shapes.
-
-This implementation makes those rules explicit.
-
----
-
-## 8. Main Bug Fixes
-
-### Fix 1: Center-of-gravity bias
-
-A non-zero background biases raw image moments. The implementation now uses black/white default synthetic images and supports contrast-based moments.
-
-Recommended:
+Useful visual panels:
 
 ```text
-center_mode = contrast
+results/circle_clean/panel_greedy.png
+results/circle_noisy/panel_greedy.png
+results/u_shape_clean/panel_greedy.png
+results/u_shape_noisy/panel_greedy.png
+results/<case>/panel_graph.png
+results/<case>/panel_band_graph.png
 ```
 
-### Fix 2: Ground-truth contour definition
-
-The ground-truth contour is generated using morphological gradient:
+## Repository Layout
 
 ```text
-dilate(mask) - erode(mask)
+main.py                         full experiment runner
+requirements.txt                Python dependencies
+src/image_generation.py         synthetic shapes and noise
+src/gradients.py                Sobel gradient magnitude
+src/geometry.py                 center, scan-line, and point geometry
+src/ieps.py                     paper-faithful IEPS
+src/ieps_improved.py            concave-shape IEPS extension
+src/scf.py                      greedy, graph, and band-graph SCF
+src/evaluation.py               point and contour metrics
+src/baseline.py                 secondary Canny baseline
+src/visualization.py            saved visual outputs
+docs/RESEARCH_REPORT.md         final research write-up
+docs/FULL_IMPLEMENTATION_BUG_FIX_REPORT.md
+docs/FINAL_PLAN.md
+docs/DOXYGEN_STYLE.md
+results/                        generated figures and tables
 ```
 
-This better matches gradient-based contour evidence.
+## Presentation Summary
 
-### Fix 3: Concave-shape ordering ambiguity
-
-For concave shapes, polar-angle ordering can connect contour points incorrectly. The implementation supports topological insertion order.
-
-Recommended:
-
-```text
-order_mode = topological
-```
-
-### Fix 4: SCF missing engineering rules
-
-SCF now includes:
-
-```text
-stop_tolerance = 2 pixels
-visited set for loop prevention
-tie-breaking by score, gradient, and distance
-weak-gradient fallback
-max-step limit
-border checks
-```
-
----
-
-## 9. Traditional CV Improvements Included
-
-The project keeps the paper-style greedy SCF and paper IEPS as the main method. It also includes traditional-CV improvements:
-
-```text
-improved IEPS with robust interior seed and denser coverage
-gradient-weighted graph-search SCF
-band-limited curvature-aware graph SCF
-```
-
-The improved IEPS mode addresses concave-shape failures by checking whether the center of gravity lies inside an Otsu object silhouette. If it falls in the background notch, it relocates the seed to the distance-transform maximum, then uses denser scan-line coverage and boundary-style point ordering.
-
-The graph-search SCF treats the Sobel gradient image as a cost map and finds a stronger edge path between neighboring IEPS points.
-
-The band-limited curvature-aware graph SCF adds two extra traditional-CV constraints: it prefers paths near the current IEPS segment and penalizes sharp direction changes. This reduces wandering and zig-zagging while still following strong Sobel edges. These extensions are traditional computer vision, not deep learning.
-
----
-
-## 10. Generate Doxygen Documentation
-
-The code uses Doxygen-style docstrings with:
-
-```text
-@file
-@brief
-@param
-@return
-```
-
-If Doxygen is installed:
-
-```bash
-doxygen Doxyfile
-```
-
-HTML documentation will be generated under:
-
-```text
-docs/doxygen/html/
-```
-
----
-
-## 11. Recommended Presentation Message
+Use this as the main presentation line:
 
 > After the discussion with the professor, I focused the work on the authors' original direction: reimplementing and validating IEPS + SCF. Instead of adding unrelated preprocessing or large external methods, I investigated the parameters and implementation choices that are necessary to reproduce the paper's contour extraction behavior.
 
-The detailed research finding is that the main challenge was not Sobel or center of gravity alone, but the missing practical details in IEPS/SCF: scan-line sampling, threshold tuning, noise generation, stopping tolerance, loop prevention, tie-breaking, missing-edge fallback, coordinate convention, normal-line discretization, and contour-point ordering.
+My strongest finding is that the algorithm is not difficult because of Sobel itself. The difficult part is turning the paper's SCF description into exact code: stopping tolerance, loop prevention, candidate tie-breaking, weak-gradient fallback, and contour ordering all affect whether the contour closes correctly.
 
----
+## Future Work
 
-## 12. Limitations
+The next improvements should still stay close to the paper:
 
-- The method assumes one dominant object.
-- It works best when object and background have clear contrast.
-- Concave objects are more difficult than circles.
-- Heavy noise can create false gradient responses.
-- SCF is sensitive to point ordering and stopping criteria.
-- The graph-search and band-graph improvements are more robust but slower.
+- adaptive Sobel thresholding,
+- multi-scale Sobel,
+- better IEPS candidate selection for concave shapes,
+- curvature-aware SCF scoring,
+- graph-based contour ordering,
+- Snake comparison initialized from IEPS points.
 
----
-
-## 13. Future Work
-
-Traditional CV future work:
-
-1. Adaptive Sobel thresholding.
-2. Multi-scale Sobel gradient.
-3. Hybrid IEPS candidate selection.
-4. Curvature-aware SCF scoring.
-5. Graph-based contour ordering.
-6. Full Snake comparison using IEPS initialization.
-7. Full Chen method comparison.
-
-Deep learning such as U-Net should only be mentioned as future work, not as part of this assignment implementation.
+U-Net or other deep-learning methods should only be mentioned as future work, not as part of this assignment's main implementation.

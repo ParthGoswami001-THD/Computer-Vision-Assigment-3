@@ -27,6 +27,7 @@ from src.evaluation import (
 )
 from src.gradients import sobel_gradient_magnitude
 from src.ieps import run_ieps
+from src.ieps_improved import run_ieps_improved
 from src.image_generation import (
     add_gaussian_noise,
     create_circle_image,
@@ -70,6 +71,7 @@ def run_single_case(
     order_mode: str = "topological",
     refinement_selection: str = "farthest_from_center",
     fallback_mode: str = "max_gradient",
+    ieps_mode: str = "paper",
     scf_method: str = "greedy",
     scf_score_mode: str = "gradient_distance2",
     save_outputs: bool = True,
@@ -87,6 +89,7 @@ def run_single_case(
     @param order_mode IEPS order mode: topological or angle.
     @param refinement_selection IEPS refinement candidate rule.
     @param fallback_mode IEPS fallback: drop or max_gradient.
+    @param ieps_mode paper or improved IEPS initialization.
     @param scf_method greedy paper-style or graph improvement.
     @param scf_score_mode gradient_distance2 or gradient_only.
     @param save_outputs Save result images if True.
@@ -95,18 +98,33 @@ def run_single_case(
     case_dir = RESULTS_DIR / name
     gradient = sobel_gradient_magnitude(image)
 
-    ieps_result, ieps_ms = measure_runtime(
-        run_ieps,
-        image,
-        gradient,
-        initial_scan_lines=initial_scan_lines,
-        iterations=iterations,
-        threshold=threshold,
-        center_mode=center_mode,
-        order_mode=order_mode,
-        refinement_selection=refinement_selection,
-        fallback_mode=fallback_mode,
-    )
+    if ieps_mode == "paper":
+        ieps_result, ieps_ms = measure_runtime(
+            run_ieps,
+            image,
+            gradient,
+            initial_scan_lines=initial_scan_lines,
+            iterations=iterations,
+            threshold=threshold,
+            center_mode=center_mode,
+            order_mode=order_mode,
+            refinement_selection=refinement_selection,
+            fallback_mode=fallback_mode,
+        )
+    elif ieps_mode == "improved":
+        ieps_result, ieps_ms = measure_runtime(
+            run_ieps_improved,
+            image,
+            gradient,
+            initial_scan_lines=initial_scan_lines,
+            iterations=iterations,
+            threshold=threshold,
+            center_mode=center_mode,
+            refinement_selection="closest_to_reference",
+            fallback_mode=fallback_mode,
+        )
+    else:
+        raise ValueError(f"Unknown IEPS mode: {ieps_mode}")
 
     scf_result, scf_ms = measure_runtime(
         run_scf,
@@ -160,6 +178,7 @@ def run_single_case(
         "order_mode": order_mode,
         "refinement_selection": refinement_selection,
         "fallback_mode": fallback_mode,
+        "ieps_mode": ieps_mode,
         "scf_method": scf_method,
         "scf_score_mode": scf_score_mode,
         "scf_tolerance": scf_tolerance,
@@ -179,6 +198,47 @@ def run_single_case(
         "canny_recall": canny_metrics["recall"],
         "canny_f1": canny_metrics["f1"],
     }
+
+
+def run_improvement_comparison() -> pd.DataFrame:
+    """@brief Compare paper IEPS with improved IEPS extension.
+
+    @return Improvement comparison DataFrame.
+    """
+    rows: List[Dict[str, float | str | int | bool]] = []
+    for case, (image, _mask, contour) in _prepare_cases().items():
+        if case == "vase_like_clean":
+            continue
+        paper = run_single_case(
+            case,
+            image,
+            contour,
+            ieps_mode="paper",
+            scf_method="greedy",
+            save_outputs=False,
+        )
+        improved = run_single_case(
+            case,
+            image,
+            contour,
+            initial_scan_lines=8,
+            ieps_mode="improved",
+            scf_method="greedy",
+            save_outputs=False,
+        )
+        rows.append({
+            "case": case,
+            "paper_ieps_points": paper["ieps_points"],
+            "paper_ieps_accuracy": paper["ieps_accuracy"],
+            "paper_f1": paper["f1"],
+            "improved_ieps_points": improved["ieps_points"],
+            "improved_ieps_accuracy": improved["ieps_accuracy"],
+            "improved_f1": improved["f1"],
+            "f1_delta": improved["f1"] - paper["f1"],
+            "paper_total_ms": paper["total_ms"],
+            "improved_total_ms": improved["total_ms"],
+        })
+    return pd.DataFrame(rows)
 
 
 def run_main_experiments() -> pd.DataFrame:
@@ -263,15 +323,19 @@ def main() -> None:
     main_results = run_main_experiments()
     bug_fix_results = run_bug_fix_study()
     parameter_results = run_parameter_study()
+    improvement_results = run_improvement_comparison()
 
     main_results.to_csv(RESULTS_DIR / "tables" / "main_results.csv", index=False)
     bug_fix_results.to_csv(RESULTS_DIR / "tables" / "bug_fix_study.csv", index=False)
     parameter_results.to_csv(RESULTS_DIR / "tables" / "parameter_study.csv", index=False)
+    improvement_results.to_csv(RESULTS_DIR / "tables" / "improvement_comparison.csv", index=False)
 
     print("\nMain results:")
     print(main_results[["case", "scf_method", "ieps_points", "ieps_accuracy", "precision", "recall", "f1", "total_ms"]])
     print("\nBug/fix study:")
     print(bug_fix_results[["case", "center_mode", "order_mode", "refinement_selection", "scf_method", "ieps_accuracy", "f1"]])
+    print("\nImprovement comparison:")
+    print(improvement_results[["case", "paper_f1", "improved_f1", "f1_delta", "paper_ieps_accuracy", "improved_ieps_accuracy"]])
     print("\nSaved results under:", RESULTS_DIR)
 
 

@@ -50,6 +50,7 @@ The project also documents bugs, missing implementation details, and traditional
 - Center-of-gravity modes: `raw`, `contrast`, `binary`
 - IEPS order modes: `topological`, `angle`
 - IEPS refinement selection modes: `farthest_from_center`, `max_gradient`, `closest_to_reference`
+- Optional improved IEPS mode with robust interior seed and denser scan lines
 - SCF score modes: `gradient_distance2`, `gradient_only`
 - Optional graph-search SCF as a traditional-CV improvement
 
@@ -76,6 +77,7 @@ cv_assignment3_ieps_scf/
 |   +-- gradients.py
 |   +-- geometry.py
 |   +-- ieps.py
+|   +-- ieps_improved.py
 |   +-- scf.py
 |   +-- baseline.py
 |   +-- evaluation.py
@@ -126,8 +128,9 @@ The script will:
 4. Run graph-search SCF as a traditional-CV improvement.
 5. Run Canny baseline.
 6. Run bug/fix study.
-7. Run parameter study.
-8. Save images and CSV tables.
+7. Run improved-IEPS comparison.
+8. Run parameter study.
+9. Save images and CSV tables.
 
 ---
 
@@ -154,6 +157,7 @@ CSV tables:
 results/tables/main_results.csv
 results/tables/bug_fix_study.csv
 results/tables/parameter_study.csv
+results/tables/improvement_comparison.csv
 ```
 
 ---
@@ -232,13 +236,16 @@ border checks
 
 ## 9. Traditional CV Improvements Included
 
-The project keeps the paper-style greedy SCF as the main method. It also includes one improvement:
+The project keeps the paper-style greedy SCF and paper IEPS as the main method. It also includes two traditional-CV improvements:
 
 ```text
+improved IEPS with robust interior seed and denser coverage
 gradient-weighted graph-search SCF
 ```
 
-This is a traditional CV improvement, not a deep learning method. It treats the Sobel gradient image as a cost map and finds a stronger edge path between neighboring IEPS points.
+The improved IEPS mode addresses concave-shape failures by checking whether the center of gravity lies inside an Otsu object silhouette. If it falls in the background notch, it relocates the seed to the distance-transform maximum, then uses denser scan-line coverage and boundary-style point ordering.
+
+The graph-search SCF treats the Sobel gradient image as a cost map and finds a stronger edge path between neighboring IEPS points. Both extensions are traditional computer vision, not deep learning.
 
 ---
 
@@ -269,7 +276,7 @@ docs/doxygen/html/
 
 ## 11. Recommended Presentation Message
 
-> I implemented the authors' IEPS + SCF method as a traditional computer vision pipeline. During reproduction, the main challenge was not Sobel or center of gravity, but the missing practical details in SCF: stopping tolerance, loop prevention, tie-breaking, weak-gradient fallback, and contour-point ordering. These choices strongly affect contour closure, especially for concave U-shapes. I also tested traditional CV fixes such as contrast-based moments and graph-search contour following.
+> I implemented the authors' IEPS + SCF method as a traditional computer vision pipeline. During reproduction, the main challenge was not Sobel or center of gravity, but the missing practical details in SCF: stopping tolerance, loop prevention, tie-breaking, weak-gradient fallback, and contour-point ordering. These choices strongly affect contour closure, especially for concave U-shapes. I also tested traditional CV fixes such as contrast-based moments, robust interior IEPS seeding, denser scan-line coverage, and graph-search contour following.
 
 ---
 

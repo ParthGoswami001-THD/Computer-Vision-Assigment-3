@@ -167,6 +167,12 @@ The aim is not to create a new algorithm, but to show which missing or weakly sp
 
 - IEPS + SCF
 
+### Traditional-CV Extension
+
+- Improved IEPS + SCF
+
+The improved IEPS mode keeps the authors' initialization direction but replaces a fragile center assumption with a robust interior seed. If the center of gravity lies outside the Otsu object silhouette, the seed is relocated to the distance-transform maximum. The method also uses denser scan-line coverage and boundary-style point ordering for concave objects.
+
 ### Secondary Baseline
 
 - Canny + OpenCV `findContours`
@@ -206,3 +212,5 @@ Expected limitations:
 ## 11. Final Contribution Statement
 
 This project contributes a reproducible traditional computer vision implementation of IEPS + SCF. It follows the authors' direction and documents the practical SCF rules that are necessary to make the algorithm executable: stopping tolerance, loop prevention, candidate tie-breaking, weak-gradient fallback, and max-step handling.
+
+It also identifies a deeper IEPS limitation: the paper's IEPS assumes the center of gravity lies inside a star-convex object. This fails on concave U-shapes. A traditional CV fix using an interior distance-transform seed and denser scan-line coverage improves U-shape performance while preserving circle performance.

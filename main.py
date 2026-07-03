@@ -90,7 +90,7 @@ def run_single_case(
     @param refinement_selection IEPS refinement candidate rule.
     @param fallback_mode IEPS fallback: drop or max_gradient.
     @param ieps_mode paper or improved IEPS initialization.
-    @param scf_method greedy paper-style or graph improvement.
+    @param scf_method greedy paper-style, graph, or band_graph improvement.
     @param scf_score_mode gradient_distance2 or gradient_only.
     @param save_outputs Save result images if True.
     @return Metrics dictionary.
@@ -253,6 +253,7 @@ def run_main_experiments() -> pd.DataFrame:
             continue
         rows.append(run_single_case(case, image, contour, scf_method="greedy", save_outputs=True))
         rows.append(run_single_case(case, image, contour, scf_method="graph", save_outputs=True))
+        rows.append(run_single_case(case, image, contour, scf_method="band_graph", save_outputs=True))
     return pd.DataFrame(rows)
 
 
@@ -291,6 +292,10 @@ def run_bug_fix_study() -> pd.DataFrame:
     rows.append(run_single_case(
         "fix_graph_search_scf", image, contour,
         scf_method="graph", save_outputs=False,
+    ))
+    rows.append(run_single_case(
+        "fix_band_graph_scf", image, contour,
+        scf_method="band_graph", save_outputs=False,
     ))
 
     return pd.DataFrame(rows)

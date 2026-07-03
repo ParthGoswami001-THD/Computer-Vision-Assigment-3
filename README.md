@@ -53,6 +53,7 @@ The project also documents bugs, missing implementation details, and traditional
 - Optional improved IEPS mode with robust interior seed and denser scan lines
 - SCF score modes: `gradient_distance2`, `gradient_only`
 - Optional graph-search SCF as a traditional-CV improvement
+- Optional band-limited curvature-aware graph SCF
 
 ### Secondary baseline
 
@@ -126,11 +127,12 @@ The script will:
 2. Run IEPS.
 3. Run paper-style greedy SCF.
 4. Run graph-search SCF as a traditional-CV improvement.
-5. Run Canny baseline.
-6. Run bug/fix study.
-7. Run improved-IEPS comparison.
-8. Run parameter study.
-9. Save images and CSV tables.
+5. Run band-limited curvature-aware graph SCF as a stronger traditional-CV improvement.
+6. Run Canny baseline.
+7. Run bug/fix study.
+8. Run improved-IEPS comparison.
+9. Run parameter study.
+10. Save images and CSV tables.
 
 ---
 
@@ -149,6 +151,7 @@ Improved graph-SCF panels:
 
 ```text
 results/<case>/panel_graph.png
+results/<case>/panel_band_graph.png
 ```
 
 CSV tables:
@@ -236,16 +239,19 @@ border checks
 
 ## 9. Traditional CV Improvements Included
 
-The project keeps the paper-style greedy SCF and paper IEPS as the main method. It also includes two traditional-CV improvements:
+The project keeps the paper-style greedy SCF and paper IEPS as the main method. It also includes traditional-CV improvements:
 
 ```text
 improved IEPS with robust interior seed and denser coverage
 gradient-weighted graph-search SCF
+band-limited curvature-aware graph SCF
 ```
 
 The improved IEPS mode addresses concave-shape failures by checking whether the center of gravity lies inside an Otsu object silhouette. If it falls in the background notch, it relocates the seed to the distance-transform maximum, then uses denser scan-line coverage and boundary-style point ordering.
 
-The graph-search SCF treats the Sobel gradient image as a cost map and finds a stronger edge path between neighboring IEPS points. Both extensions are traditional computer vision, not deep learning.
+The graph-search SCF treats the Sobel gradient image as a cost map and finds a stronger edge path between neighboring IEPS points.
+
+The band-limited curvature-aware graph SCF adds two extra traditional-CV constraints: it prefers paths near the current IEPS segment and penalizes sharp direction changes. This reduces wandering and zig-zagging while still following strong Sobel edges. These extensions are traditional computer vision, not deep learning.
 
 ---
 
@@ -276,7 +282,7 @@ docs/doxygen/html/
 
 ## 11. Recommended Presentation Message
 
-> I implemented the authors' IEPS + SCF method as a traditional computer vision pipeline. During reproduction, the main challenge was not Sobel or center of gravity, but the missing practical details in SCF: stopping tolerance, loop prevention, tie-breaking, weak-gradient fallback, and contour-point ordering. These choices strongly affect contour closure, especially for concave U-shapes. I also tested traditional CV fixes such as contrast-based moments, robust interior IEPS seeding, denser scan-line coverage, and graph-search contour following.
+> I implemented the authors' IEPS + SCF method as a traditional computer vision pipeline. During reproduction, the main challenge was not Sobel or center of gravity, but the missing practical details in SCF: stopping tolerance, loop prevention, tie-breaking, weak-gradient fallback, and contour-point ordering. These choices strongly affect contour closure, especially for concave U-shapes. I also tested traditional CV fixes such as contrast-based moments, robust interior IEPS seeding, denser scan-line coverage, graph-search contour following, and band-limited curvature-aware SCF.
 
 ---
 
@@ -287,7 +293,7 @@ docs/doxygen/html/
 - Concave objects are more difficult than circles.
 - Heavy noise can create false gradient responses.
 - SCF is sensitive to point ordering and stopping criteria.
-- The graph-search improvement is more robust but slower.
+- The graph-search and band-graph improvements are more robust but slower.
 
 ---
 

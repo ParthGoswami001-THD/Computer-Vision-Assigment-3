@@ -170,8 +170,11 @@ The aim is not to create a new algorithm, but to show which missing or weakly sp
 ### Traditional-CV Extension
 
 - Improved IEPS + SCF
+- Band-limited curvature-aware graph SCF
 
 The improved IEPS mode keeps the authors' initialization direction but replaces a fragile center assumption with a robust interior seed. If the center of gravity lies outside the Otsu object silhouette, the seed is relocated to the distance-transform maximum. The method also uses denser scan-line coverage and boundary-style point ordering for concave objects.
+
+The band-limited curvature-aware graph SCF keeps the SCF segment idea but replaces local greedy movement with A* search over an edge-cost map. The cost combines weak-gradient penalty, distance from the IEPS segment corridor, and curvature penalty. This is used as an improved traditional-CV contour-following method, not as the paper-faithful baseline.
 
 ### Secondary Baseline
 
@@ -214,3 +217,5 @@ Expected limitations:
 This project contributes a reproducible traditional computer vision implementation of IEPS + SCF. It follows the authors' direction and documents the practical SCF rules that are necessary to make the algorithm executable: stopping tolerance, loop prevention, candidate tie-breaking, weak-gradient fallback, and max-step handling.
 
 It also identifies a deeper IEPS limitation: the paper's IEPS assumes the center of gravity lies inside a star-convex object. This fails on concave U-shapes. A traditional CV fix using an interior distance-transform seed and denser scan-line coverage improves U-shape performance while preserving circle performance.
+
+For SCF, the project adds a second extension: band-limited curvature-aware graph search. This addresses the paper-style greedy mask's tendency to make local mistakes, wander on noisy gradients, or zig-zag around corners.

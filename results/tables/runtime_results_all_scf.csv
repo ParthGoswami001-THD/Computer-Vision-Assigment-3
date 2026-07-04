@@ -1,0 +1,13 @@
+case,scf_method,ieps_ms,scf_ms,total_ms,canny_ms
+circle_clean,greedy,7.0586,2.1437,9.2023,3.7094
+circle_clean,graph,6.3662,19.0811,25.4473,1.4065
+circle_clean,band_graph,6.1624,222.9090,229.0714,0.7985
+circle_noisy,greedy,6.1555,2.1061,8.2616,2.9053
+circle_noisy,graph,5.7613,23.7009,29.4622,4.5964
+circle_noisy,band_graph,5.8523,293.3111,299.1634,2.2587
+u_shape_clean,greedy,6.6206,3.0638,9.6844,1.7039
+u_shape_clean,graph,7.1727,150.4173,157.5900,1.0112
+u_shape_clean,band_graph,7.0106,1702.7096,1709.7202,0.9145
+u_shape_noisy,greedy,7.0101,4.6102,11.6203,3.5083
+u_shape_noisy,graph,6.5475,159.9365,166.4840,3.8852
+u_shape_noisy,band_graph,7.0377,1817.4229,1824.4606,2.8129

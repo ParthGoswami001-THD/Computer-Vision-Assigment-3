@@ -1,0 +1,2 @@
+case,scf_method,ieps_ms,scf_ms,total_ms,canny_ms
+u_shape_noisy,greedy,6.5930,4.3558,10.9488,14.4227

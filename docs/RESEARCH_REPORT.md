@@ -99,6 +99,8 @@ I used synthetic images similar to the author-style examples:
 
 Each case has an input image, a binary object mask, and a ground-truth contour mask. Gaussian noise is generated with fixed seeds so the results are reproducible.
 
+One deliberate deviation from the written project plan is documented here: the plan specifies synthetic intensities of background 40 and object 200, while this implementation defaults to background 0 and object 255. The reason is that raw center-of-gravity moments are biased by a non-zero background, which shifts every IEPS scan line. The generator functions still accept `background`/`foreground` arguments, so the 40/200 configuration remains reproducible, and the default `contrast` center mode (subtracting the image minimum before computing moments) handles non-zero backgrounds correctly. The bias itself is treated as one of the reproducibility findings rather than silently patched.
+
 ## Evaluation Metrics
 
 The method is evaluated at two levels:
@@ -130,6 +132,7 @@ The paper's overall idea is clear, but the implementation is not fully specified
 | Missing scan-line edge | Some lines have no pixel above threshold. | Use a configurable fallback; default is max-gradient point. |
 | Coordinate convention | Paper uses `(x, y)`; OpenCV arrays use `[y, x]`. | Public geometry uses `(x, y)` and converts only when indexing arrays. |
 | Normal-line discretization | The paper gives the math, not exact pixels. | Sample a finite integer line with decreasing radius each iteration. |
+| Refinement rule and point order | Different refinement candidates and orders change the U-shape contour. | Defaults are `farthest_from_center` and `topological`; `closest_to_reference`, `max_gradient`, and `angle` order are measured in the parameter study. |
 
 The SCF part was the most sensitive. Without explicit stopping, loop prevention, tie-breaking, and fallback rules, the contour follower is easy to make unstable.
 
@@ -145,13 +148,13 @@ This project validates the paper direction end to end: the author-style syntheti
 |---|---|---|
 | Man-made circle and U-shape images, clean and noisy | The paper uses synthetic images where true edge positions are known. | The project generates clean/noisy circle and U-shape images with ground-truth contour masks. |
 | IEPS setup | 4 scan lines, 3 iterations, threshold 64, 32 initial edge points. | Implemented as the paper-style default. Main runs produce 32 IEPS points for all four required cases. |
-| IEPS true-positive ratio versus Yuen [2] | Paper Table II reports Yuen: circle 17/32, U-shape 23/32; IEPS: circle 22/32, U-shape 28/32. | A Yuen-style fixed-angle farthest-edge initialization baseline is implemented and compared with paper IEPS in `paper_comparison_results.csv`. Our paper-style IEPS gets circle noisy 32/32 and U-shape noisy 25/32 with the current 2-pixel tolerance. Improved IEPS gets U-shape noisy 60/64. |
+| IEPS true-positive ratio versus Yuen [2] | Paper Table II reports Yuen: circle 17/32, U-shape 23/32; IEPS: circle 22/32, U-shape 28/32. | A Yuen-style fixed-angle farthest-edge initialization baseline is implemented and compared with paper IEPS in `paper_comparison_results.csv`. Our paper-style IEPS gets circle noisy 32/32 and U-shape noisy 25/32 with the current 2-pixel tolerance. Improved IEPS gets U-shape noisy 60/64. **Honest caveat: in the current run the Yuen-style approximation scores 29/32 on the noisy U-shape, i.e., it is not worse than paper-mode IEPS. That is the opposite direction from the paper's Table II and is reported as a limitation of the approximation and synthetic geometry, not as a refutation of the paper.** |
 | Neighbor distance and standard deviation | Paper Table III reports IEPS circle mean/std 19.492/3.923 and U-shape mean/std 17.893/4.438. | Current paper-style IEPS gives circle noisy mean/std 13.861/0.333 and U-shape noisy mean/std 19.310/5.573. Absolute means differ because the synthetic image geometry is not identical, but the same spacing idea is measured. |
-| Snake results using Yuen and IEPS initial points [3] | Paper Fig. 7 and Fig. 8 show Snake converging better with IEPS initial points. | A simple greedy Snake-style approximation is implemented for both Yuen-style and IEPS initial points. It is useful for validating the experimental structure, but it is not claimed as the exact Kass variational solver. |
-| SCF true-positive ratio versus Chen [4] | Paper Table IV reports Chen around 80-81% and proposed SCF around 96-98% for noisy circles at different SNR values. | Chen-style gradient-only tracing and proposed gradient/distance SCF are both run at 29.9, 23.9, and 20.3 dB. The SNR generation and Chen baseline are documented approximations, so the table validates behavior rather than claiming identical paper numbers. |
+| Snake results using Yuen and IEPS initial points [3] | Paper Fig. 7 and Fig. 8 show Snake converging better with IEPS initial points. | A simple greedy Snake-style approximation is implemented for both Yuen-style and IEPS initial points. It is useful for validating the experimental structure, but it is not claimed as the exact Kass variational solver. **Honest caveat: the current run does not reproduce the paper's direction. Snake from Yuen-style points scores at least as well as Snake from IEPS points (circle F1 equal at 0.633; U-shape 0.389 versus 0.339), so this comparison is structural context only.** |
+| SCF true-positive ratio versus Chen [4] | Paper Table IV reports Chen around 80-81% and proposed SCF around 96-98% for noisy circles at different SNR values. | Chen-style gradient-only tracing and proposed gradient/distance SCF are both run at 29.9, 23.9, and 20.3 dB. **Honest caveat: this test does not reproduce the paper's Chen-versus-SCF gap. In the current run both methods reach F1 = 1.0 at all three SNR levels, so the comparison is non-discriminating: the synthetic circle at these noise levels is too easy to separate gradient-only tracing from the gravity-style score. The SNR generation and Chen baseline are documented approximations, and this table should not be cited as evidence for or against the paper's Table IV numbers.** |
 | Real vase image and timing | Paper compares Snake, Chen, and proposed SCF on a vase image. | The project supports a real-vase test through `data/vase.png` or common alternatives such as WebP, with optional `data/vase_mask.png`. It also generates simple Snake-style, Chen-style, and proposed SCF comparison rows. If the image is missing, the run uses a clearly labeled synthetic fallback and does not claim to reproduce the paper's original vase timing table. |
 
-The closest direct reproduction is still the IEPS setup and synthetic-shape validation. The comparison with Yuen, Snake, and Chen is now executable, but should be described as approximation baselines because the paper does not provide enough implementation detail to reproduce those cited methods exactly.
+The closest direct reproduction is still the IEPS setup and synthetic-shape validation. The comparison with Yuen, Snake, and Chen is now executable, but should be described as approximation baselines because the paper does not provide enough implementation detail to reproduce those cited methods exactly. In their current form these approximations do not reproduce the paper's comparative claims: Yuen-style initialization is not worse than IEPS on the noisy U-shape, Snake from Yuen-style points is not worse than Snake from IEPS points, and Chen-style tracing ties the proposed SCF at every tested SNR. For the presentation, these tables are structural context that shows the experimental design can be executed; the reproduction evidence for the paper itself comes from the IEPS + SCF pipeline and its own validation.
 
 This validation is a one-time interpretation after implementing the method, not a separate runtime experiment. The report text above explains which paper results are reproduced, which are approximate comparisons, and where exact reproduction is limited by missing paper details. `paper_comparison_results.csv` is kept only as the raw long-form measurement log. For the report and presentation, the same data is exported as clean comparison tables:
 
@@ -189,9 +192,11 @@ results/tables/real_vase_results.csv
 
 If `data/vase_mask.png` is not provided, the mask is estimated with Otsu thresholding and largest-component selection. Those values are useful for qualitative validation, but they should not be described as true ground-truth measurements. If no local vase image is found, the code uses the synthetic vase-like fallback and marks the row as `synthetic_fallback_missing_real_vase_image`.
 
+One honest caveat on the improved IEPS extension: on the current real vase image the improved mode performs much worse than paper mode (proxy F1 about 0.25 versus 0.94), because the denser rays, gap filling, and nearest-neighbor reordering misfire on the vase silhouette and its estimated mask. The improved mode's gains are therefore claimed only for the synthetic concave U-shape, not as a general improvement.
+
 ## Results Summary
 
-The normal command `python main.py` writes the main synthetic results to `results/tables/main_results.csv`. The complete regeneration command is `python main.py --run all`. The high-level behavior is:
+The normal command `python main.py` runs the paper-style greedy SCF and writes `results/tables/main_results.csv` plus the dedicated `results/tables/runtime_results.csv`. The graph and band-graph extension methods are opt-in via `python main.py --run main --scf all`, which writes `results/tables/main_results_all_scf.csv` so the extension rows never mix into the paper-method table. The complete regeneration command is `python main.py --run all`. The high-level behavior is:
 
 - Circle cases are handled very well by the paper-style method.
 - U-shape cases are harder because concavity breaks some assumptions behind center-based scan lines and local contour following.
@@ -230,7 +235,11 @@ The parameter study stays inside IEPS and SCF rather than adding unrelated algor
 | IEPS iterations | 2, 3 |
 | SCF stopping tolerance | 1, 2, 3 pixels |
 | SCF score | gradient only, gradient / distance^2 |
+| IEPS refinement rule | farthest_from_center, closest_to_reference, max_gradient |
+| IEPS point order | topological, angle |
 | Noise level | clean, low noise, paper-like noisy |
+
+The refinement-rule and point-order rows exist because the written implementation plan describes closest-to-midpoint refinement and angle-sorted ordering, while the paper-mode defaults here are farthest-from-center and topological insertion order. Measuring both sides keeps that deviation explicit instead of hidden, and the measurement supports the defaults: on the noisy U-shape, farthest-from-center refinement reaches F1 0.591 versus 0.442 for closest-to-reference and 0.436 for max-gradient, while topological and angle order tie on this case (0.591).
 
 This is important because it turns the paper's missing details into measurable choices instead of hidden assumptions.
 

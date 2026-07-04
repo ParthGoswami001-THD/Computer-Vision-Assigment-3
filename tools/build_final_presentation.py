@@ -96,9 +96,15 @@ param_rows = read_csv(ROOT / "results" / "tables" / "parameter_study.csv")
 improve_rows = read_csv(ROOT / "results" / "tables" / "improvement_comparison.csv")
 vase_rows = read_csv(ROOT / "results" / "tables" / "real_vase_results.csv")
 
+# The default main table is paper-method (greedy) only; the graph/band_graph
+# extension rows live in the opt-in all-SCF table.
+_all_scf_path = ROOT / "results" / "tables" / "main_results_all_scf.csv"
+variant_rows = read_csv(_all_scf_path) if _all_scf_path.exists() else main_rows
+
 
 def main_case(case: str, method: str = "greedy") -> Dict[str, str]:
-    return get_rows(main_rows, case=case, scf_method=method)[0]
+    rows = main_rows if method == "greedy" else variant_rows
+    return get_rows(rows, case=case, scf_method=method)[0]
 
 
 circle_clean = main_case("circle_clean")
@@ -298,7 +304,7 @@ def build_slides() -> None:
     add_text(s, "A traditional computer vision reproducibility study of Hsu et al. (ICARCV 2010)", 64, 252, 720, 56, size=18, color=MUTED)
     add_card(s, 64, 382, 342, 150, "Final research question", "Can the method be rebuilt from the paper description and validated on author-style circle and U-shape images, including noise, while identifying missing implementation choices?", ACCENT)
     add_card(s, 430, 382, 300, 150, "Core claim", "The method is reproducible for star-convex shapes; concave U-shapes expose under-specified assumptions in IEPS and SCF.", BLUE)
-    add_image(s, ROOT / "results" / "u_shape_noisy" / "panel_greedy.png", 820, 116, 380, 284, caption="Project-generated U-shape noisy IEPS + SCF panel")
+    add_image(s, ROOT / "results" / "u_shape_noisy" / "panel.png", 820, 116, 380, 284, caption="Project-generated U-shape noisy IEPS + SCF panel")
     add_rect(s, 820, 430, 380, 86, fill=INK, line=INK)
     add_text(s, "Contribution: implementation + validation + missing-detail audit", 844, 454, 332, 38, size=17, color="FFFFFF", bold=True, align="center", valign="middle")
     slides.append(s)
@@ -346,15 +352,15 @@ def build_slides() -> None:
     add_title(s, "SCF: from flow chart to code", "Segmental contour following", "Each neighboring IEPS pair defines one segment; the implementation turns the paper's direction mask into deterministic pixel tracing.")
     add_pipeline(s, [("Si -> Si+1", "neighboring IEPS points define target direction"), ("Direction state", "sign(Dx), sign(Dy) maps to N, NE, E, ..."), ("Candidate mask", "local candidates consistent with direction"), ("Score", "gradient / (distance^2 + 1) by default"), ("Stop", "target reached within tolerance or guard rule fires")], 74, 206, 1132, 150)
     add_table(s, 78, 420, 548, 160, ["Paper phrase", "Implemented assumption"], [["closed contour?", "all segments finish and concatenate"], ["force of gravity", "gradient plus inverse squared target distance"], ["mask direction", "three candidate moves by related direction"], ["avoid loops", "visited-pixel and max-step guards"]], [0.38, 0.62], 12)
-    add_image(s, ROOT / "results" / "circle_noisy" / "scf_greedy.png", 700, 412, 220, 180, caption="circle SCF")
-    add_image(s, ROOT / "results" / "u_shape_noisy" / "scf_greedy.png", 956, 412, 220, 180, caption="U-shape SCF")
+    add_image(s, ROOT / "results" / "circle_noisy" / "scf_contour.png", 700, 412, 220, 180, caption="circle SCF")
+    add_image(s, ROOT / "results" / "u_shape_noisy" / "scf_contour.png", 956, 412, 220, 180, caption="U-shape SCF")
     slides.append(s)
 
     s = Slide("Validation design")
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
     add_title(s, "Validation design", "Experiments", "The validation is intentionally close to the paper: author-style synthetic shapes, Gaussian noise, IEPS point accuracy, final contour metrics, and runtime.")
-    add_image(s, ROOT / "results" / "circle_noisy" / "panel_greedy.png", 64, 204, 540, 236, caption="circle_noisy panel")
-    add_image(s, ROOT / "results" / "u_shape_noisy" / "panel_greedy.png", 676, 204, 540, 236, caption="u_shape_noisy panel")
+    add_image(s, ROOT / "results" / "circle_noisy" / "panel.png", 64, 204, 540, 236, caption="circle_noisy panel")
+    add_image(s, ROOT / "results" / "u_shape_noisy" / "panel.png", 676, 204, 540, 236, caption="u_shape_noisy panel")
     add_table(s, 86, 504, 1088, 100, ["Metric", "Purpose", "Current operational definition"], [["IEPS accuracy", "validate initial edge points", "point is correct if within 2 px of ground-truth contour"], ["Precision / recall / F1", "validate final contour", "predicted contour mask compared to ground truth with tolerance"], ["Runtime", "efficiency", "IEPS time + SCF time in milliseconds"]], [0.18, 0.27, 0.55], 12)
     slides.append(s)
 
@@ -369,8 +375,8 @@ def build_slides() -> None:
 
     s = Slide("What authors forgot")
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
-    add_title(s, "What the paper forgot to specify", "Reproducibility contribution", "These are not small coding details. They directly change selected IEPS points, segment tracing, and reported accuracy.")
-    add_table(s, 64, 190, 1152, 424, ["Missing detail", "Why it matters", "Project assumption"], [["Scan-line discretization", "which pixels lie on a ray or normal line", "implemented explicit row/column sampling"], ["Threshold tuning", "64 works for paper scale, not universal", "tested 40/64/90"], ["Noise generation", "SNR cannot be reproduced exactly", "documented Gaussian sigma and SNR cases"], ["True-positive tolerance", "point accuracy changes with radius", "used 2 px tolerance"], ["SCF stopping", "'closed contour?' is not code", "target tolerance plus guard rules"], ["Tie-breaking", "many candidate pixels can score similarly", "deterministic candidate order"], ["Loop prevention", "contour following can revisit pixels", "visited-set and max-step checks"], ["Coordinate convention", "paper x/y vs OpenCV row/column", "kept public points as (x, y)"]], [0.26, 0.37, 0.37], 11)
+    add_title(s, "What the paper forgot to specify", "Reproducibility contribution", "The main reproducibility challenge was SCF: the paper gives the gravity-force and mask idea, but not stopping tolerance, loop prevention, tie-breaking, weak-gradient fallback, or max-step handling. These choices were implemented explicitly and evaluated.")
+    add_table(s, 64, 190, 1152, 424, ["Missing detail", "Why it matters", "Project assumption"], [["Scan-line discretization", "which pixels lie on a ray or normal line", "implemented explicit row/column sampling"], ["Threshold tuning", "64 works for paper scale, not universal", "tested 40/64/90"], ["Noise generation", "SNR cannot be reproduced exactly", "documented Gaussian sigma and SNR cases"], ["True-positive tolerance", "point accuracy changes with radius", "used 2 px tolerance"], ["SCF stopping", "'closed contour?' is not code", "target tolerance plus guard rules"], ["Tie-breaking", "many candidate pixels can score similarly", "deterministic candidate order"], ["Loop prevention", "contour following can revisit pixels", "visited-set and max-step checks"], ["Missing scan-line edge", "noisy lines can fail the threshold", "configurable fallback; default max-gradient point"], ["Coordinate convention", "paper x/y vs OpenCV row/column", "kept public points as (x, y)"]], [0.26, 0.37, 0.37], 11)
     slides.append(s)
 
     s = Slide("Parameter validation")
@@ -393,13 +399,14 @@ def build_slides() -> None:
         if "u_shape" in r["case"] or r["case"] == "circle_noisy":
             imp_table.append([r["case"], pct(r["paper_f1"]), pct(r["improved_f1"]), f"+{float(r['f1_delta']) * 100:.1f} pts", pct(r["paper_ieps_accuracy"]), pct(r["improved_ieps_accuracy"])])
     add_table(s, 94, 442, 1088, 132, ["Case", "Paper F1", "Improved F1", "Delta", "Paper IEPS", "Improved IEPS"], imp_table, [0.24, 0.15, 0.16, 0.13, 0.16, 0.16], 12)
+    add_text(s, "Scope note: the improvement is claimed for the synthetic concave U-shape only. On the real vase the improved mode underperforms paper mode (proxy F1 0.25 vs 0.94), so it is an extension for the U-shape failure mode, not a general upgrade.", 94, 586, 1088, 36, size=12, color=MUTED)
     slides.append(s)
 
     s = Slide("SCF variants")
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
     add_title(s, "SCF implementation variants", "Method audit", "The paper-faithful greedy SCF is the default. Graph variants test whether the local segment-following assumption is responsible for U-shape errors.")
     add_table(s, 78, 196, 520, 210, ["Method", "Role", "U noisy F1", "Runtime"], [["greedy", "paper-style local tracing", pct(u_noisy["f1"]), f"{float(u_noisy['total_ms']):.1f} ms"], ["graph", "global cost path", pct(u_graph["f1"]), f"{float(u_graph['total_ms']):.1f} ms"], ["band_graph", "corridor + curvature penalty", pct(u_band["f1"]), f"{float(u_band['total_ms']):.1f} ms"]], [0.24, 0.38, 0.18, 0.20], 12)
-    add_image(s, ROOT / "results" / "u_shape_noisy" / "panel_greedy.png", 672, 184, 500, 178, caption="paper-style greedy")
+    add_image(s, ROOT / "results" / "u_shape_noisy" / "panel.png", 672, 184, 500, 178, caption="paper-style greedy")
     add_image(s, ROOT / "results" / "u_shape_noisy" / "panel_band_graph.png", 672, 430, 500, 178, caption="band graph variant")
     add_card(s, 80, 462, 518, 102, "Interpretation", "Band-graph improves contour quality slightly on the U-shape, but the larger improvement comes from IEPS initialization. That supports the paper's emphasis on initial edge point quality.", ACCENT)
     slides.append(s)
@@ -408,13 +415,14 @@ def build_slides() -> None:
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
     add_title(s, "Baseline comparisons are contextual only", "Unavailable baseline source code", "The paper reports Yuen, Snake/Kass, and Chen comparisons, but it does not provide enough implementation detail for exact source-level reproduction.")
     add_table(s, 64, 190, 1152, 214, ["Paper comparison", "What this project implements", "Claim level"], [["Yuen initialization", "fixed-angle farthest-edge approximation", "context-only baseline"], ["Snake/Kass", "simple greedy Snake-style relaxation", "not full variational solver"], ["Chen tracing", "gradient-only SCF approximation", "behavioral context"], ["SNR table", "Gaussian SNR noise generated from image variance", "not pixel-identical noise"]], [0.24, 0.48, 0.28], 12)
-    add_table(s, 116, 462, 1048, 104, ["Case", "Yuen-style true points", "IEPS true points", "What to say"], [["circle_noisy", "32/32", "32/32", "both succeed on current synthetic circle"], ["u_shape_noisy", "29/32", "25/32", "approximation differs from paper; report as limitation"]], [0.22, 0.22, 0.18, 0.38], 12)
+    add_table(s, 116, 462, 1048, 104, ["Case", "Yuen-style true points", "IEPS true points", "What to say"], [["circle_noisy", "32/32", "32/32", "both succeed on current synthetic circle"], ["u_shape_noisy", "29/32", "25/32", "opposite direction vs paper Table II; approximation limitation"]], [0.22, 0.22, 0.18, 0.38], 12)
+    add_text(s, "Current runs also show Snake from Yuen-style points >= Snake from IEPS points, and Chen-style == proposed SCF (F1 = 1.0) at all tested SNRs. These approximations do not reproduce the paper's reported gaps and are structural context only.", 116, 580, 1048, 40, size=12, color=MUTED)
     slides.append(s)
 
     s = Slide("Real vase")
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
     add_title(s, "Real vase test path", "Qualitative validation", "The project now supports a real image path with optional mask. Without the paper's original vase and exact baselines, vase metrics are proxy evidence.")
-    add_image(s, ROOT / "results" / "real_vase_paper" / "panel_greedy.png", 70, 190, 548, 238, caption="real_vase_paper: generated panel")
+    add_image(s, ROOT / "results" / "real_vase_paper" / "panel.png", 70, 190, 548, 238, caption="real_vase_paper: generated panel")
     add_image(s, ROOT / "results" / "paper_comparisons" / "vase_proposed_scf_gradient_distance.png", 716, 202, 240, 238, caption="proposed SCF contour")
     add_image(s, ROOT / "results" / "paper_comparisons" / "vase_chen_style_gradient_only.png", 982, 202, 206, 238, caption="Chen-style approximation")
     rv = vase_rows[0] if vase_rows else {}

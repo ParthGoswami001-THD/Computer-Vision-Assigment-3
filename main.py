@@ -5,9 +5,10 @@ Execute from project root:
     python main.py
     python main.py --run all
 
-By default the script runs only the main author-style synthetic experiment.
-Use --run to generate parameter studies, paper comparisons, real-vase tests, or
-the complete result set.
+By default the script runs only the main author-style synthetic experiment with
+the paper-style greedy SCF. Use --run to generate parameter studies, paper
+comparisons, real-vase tests, or the complete result set, and --scf to opt into
+the graph/band_graph extension methods.
 """
 
 from __future__ import annotations
@@ -44,7 +45,15 @@ from src.paper_baselines import (
     run_simple_snake,
     run_yuen_style_initialization,
 )
-from src.visualization import draw_center, draw_contour_points, draw_points, make_panel, overlay_mask, save_image
+from src.visualization import (
+    draw_center,
+    draw_contour_points,
+    draw_points,
+    draw_scan_lines,
+    make_panel,
+    overlay_mask,
+    save_image,
+)
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -62,7 +71,7 @@ RUN_ORDER = [
     "paper-comparison",
 ]
 RUN_DESCRIPTIONS = {
-    "main": "Core synthetic circle/U-shape IEPS + SCF results.",
+    "main": "Core synthetic circle/U-shape IEPS + SCF results (paper-style greedy SCF by default).",
     "parameter": "Reproducibility parameter study inside IEPS + SCF.",
     "improvement": "Paper IEPS versus improved IEPS extension.",
     "vase": "Real-vase path, or clearly labeled fallback if no vase image exists.",
@@ -171,16 +180,26 @@ def run_single_case(
     ieps_acc = point_accuracy(ieps_result.points, gt_contour, tolerance=2)
     neighbor_stats = neighbor_distance_stats(ieps_result.points)
 
-    canny_mask, _ = canny_contour_baseline(image)
+    (canny_mask, _canny_points), canny_ms = measure_runtime(canny_contour_baseline, image)
     canny_metrics = contour_metrics(canny_mask, gt_contour, tolerance=2)
 
     if save_outputs:
+        # Plan-style output names; the paper-style greedy run owns the plain
+        # names, extension SCF methods get a method suffix.
+        scf_image_name = "scf_contour.png" if scf_method == "greedy" else f"scf_contour_{scf_method}.png"
+        panel_name = "panel.png" if scf_method == "greedy" else f"panel_{scf_method}.png"
+        initial_lines = ieps_result.debug.get("initial_scan_lines", [])
+        points_by_iteration = ieps_result.debug.get("points_by_iteration") or [[]]
         save_image(case_dir / "original.png", image)
-        save_image(case_dir / "sobel_gradient.png", gradient.astype(np.uint8))
-        save_image(case_dir / "ground_truth_contour.png", gt_contour)
+        save_image(case_dir / "gradient.png", gradient.astype(np.uint8))
+        save_image(case_dir / "ground_truth.png", gt_contour)
         save_image(case_dir / "center.png", draw_center(image, ieps_result.center))
+        save_image(
+            case_dir / "initial_scan_lines.png",
+            draw_scan_lines(image, initial_lines, points=points_by_iteration[0], center=ieps_result.center),
+        )
         save_image(case_dir / "ieps_points.png", draw_points(image, ieps_result.points))
-        save_image(case_dir / f"scf_{scf_method}.png", draw_contour_points(image, scf_result.contour_points))
+        save_image(case_dir / scf_image_name, draw_contour_points(image, scf_result.contour_points))
         save_image(case_dir / "canny_baseline.png", overlay_mask(image, canny_mask, color=(255, 0, 0)))
         panel = make_panel(
             [
@@ -193,7 +212,7 @@ def run_single_case(
             ],
             ["Input", "Sobel", "CoG", "IEPS", f"SCF-{scf_method}", "Ground Truth"],
         )
-        save_image(case_dir / f"panel_{scf_method}.png", panel)
+        save_image(case_dir / panel_name, panel)
 
     stopping_reasons = [str(s.get("stopping_reason", "")) for s in scf_result.debug.get("segments", [])]
     target_reached_count = sum(r == "target_reached" for r in stopping_reasons)
@@ -226,6 +245,7 @@ def run_single_case(
         "canny_precision": canny_metrics["precision"],
         "canny_recall": canny_metrics["recall"],
         "canny_f1": canny_metrics["f1"],
+        "canny_ms": canny_ms,
     }
 
 
@@ -317,6 +337,25 @@ def run_parameter_study() -> pd.DataFrame:
             image,
             contour,
             scf_score_mode=score_mode,
+            save_outputs=False,
+        ))
+    # The implementation plan describes closest-to-midpoint refinement and
+    # angle-sorted point order; the paper-mode defaults differ, so both
+    # under-specified choices are measured here instead of hidden.
+    for refinement_selection in ["farthest_from_center", "closest_to_reference", "max_gradient"]:
+        rows.append(run_single_case(
+            f"param_refinement_{refinement_selection}",
+            image,
+            contour,
+            refinement_selection=refinement_selection,
+            save_outputs=False,
+        ))
+    for order_mode in ["topological", "angle"]:
+        rows.append(run_single_case(
+            f"param_order_{order_mode}",
+            image,
+            contour,
+            order_mode=order_mode,
             save_outputs=False,
         ))
     for noise_name, noise_image in [
@@ -850,10 +889,18 @@ def _selected_cases(case_selector: str) -> List[str]:
 
 
 def _main_results_filename(case_selector: str, requested_scf_methods: Sequence[str]) -> str:
-    """@brief Use a separate table name for filtered main runs."""
-    selected_all_scf = "all" in requested_scf_methods or set(requested_scf_methods) == set(SCF_METHODS)
-    if case_selector == "all" and selected_all_scf:
+    """@brief Choose the main results table name for the selected filters.
+
+    The default paper-method run (all cases, greedy SCF) owns main_results.csv.
+    Opting into every SCF method writes the extension table
+    main_results_all_scf.csv, and any other filter uses the selected table so
+    the canonical files are never overwritten by partial runs.
+    """
+    methods = set(_normalise_scf_methods(list(requested_scf_methods)))
+    if case_selector == "all" and methods == {"greedy"}:
         return "main_results.csv"
+    if case_selector == "all" and methods == set(SCF_METHODS):
+        return "main_results_all_scf.csv"
     return "main_results_selected.csv"
 
 
@@ -880,7 +927,8 @@ def _print_available_runs() -> None:
         print(f"  {run_name:16} {RUN_DESCRIPTIONS[run_name]}")
     print("\nExamples:")
     print("  python main.py")
-    print("  python main.py --run main --case u_shape_noisy --scf greedy")
+    print("  python main.py --run main --scf all")
+    print("  python main.py --run main --case u_shape_noisy --scf graph")
     print("  python main.py --run parameter")
     print("  python main.py --run paper-comparison")
     print("  python main.py --run all")
@@ -908,8 +956,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "--scf",
         nargs="+",
         choices=[*SCF_METHODS, "all"],
-        default=["all"],
-        help="SCF method filter for --run main. Default: all.",
+        default=["greedy"],
+        help="SCF method filter for --run main. Default: greedy (paper method); graph/band_graph/all are opt-in extensions.",
     )
     parser.add_argument(
         "--no-images",
@@ -962,11 +1010,20 @@ def run_cli(args: argparse.Namespace) -> None:
 
     for run_name in requested_runs:
         if run_name == "main":
+            main_df = get_main_results(full=False)
+            main_filename = _main_results_filename(args.case, args.scf)
             _write_and_print_table(
                 "Main synthetic results",
-                get_main_results(full=False),
-                _main_results_filename(args.case, args.scf),
+                main_df,
+                main_filename,
                 ["case", "scf_method", "ieps_points", "ieps_accuracy", "precision", "recall", "f1", "total_ms"],
+            )
+            runtime_columns = ["case", "scf_method", "ieps_ms", "scf_ms", "total_ms", "canny_ms"]
+            _write_and_print_table(
+                "Runtime results",
+                main_df[[column for column in runtime_columns if column in main_df.columns]],
+                main_filename.replace("main_results", "runtime_results"),
+                runtime_columns,
             )
         elif run_name == "parameter":
             cache["parameter"] = run_parameter_study()

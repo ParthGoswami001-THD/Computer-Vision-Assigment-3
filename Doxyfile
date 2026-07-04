@@ -1,0 +1,10 @@
+PROJECT_NAME           = "IEPS_SCF_Contour_Extraction"
+OUTPUT_DIRECTORY       = docs/doxygen
+INPUT                  = src main.py
+FILE_PATTERNS          = *.py
+RECURSIVE              = YES
+EXTRACT_ALL            = YES
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+QUIET                  = YES
+OPTIMIZE_OUTPUT_JAVA   = YES

@@ -53,6 +53,37 @@ def draw_center(image: np.ndarray, center: Sequence[float], color=(0, 255, 255))
     return out
 
 
+def draw_scan_lines(
+    image: np.ndarray,
+    scan_lines: Iterable[Sequence[Point]],
+    points: Iterable[Point] | None = None,
+    center: Sequence[float] | None = None,
+    line_color=(0, 200, 255),
+    point_color=(0, 0, 255),
+) -> np.ndarray:
+    """@brief Draw IEPS initial scan lines with the selected points and center.
+
+    @param image Input image.
+    @param scan_lines Sampled scan lines, each a list of (x, y) points.
+    @param points Optional points selected on the scan lines.
+    @param center Optional scan-line origin as (x, y).
+    @param line_color BGR scan-line color.
+    @param point_color BGR selected-point color.
+    @return Output BGR image.
+    """
+    out = to_bgr(image)
+    for line in scan_lines:
+        if len(line) >= 2:
+            first, last = line[0], line[-1]
+            cv2.line(out, (int(first[0]), int(first[1])), (int(last[0]), int(last[1])), line_color, 1, cv2.LINE_AA)
+    if center is not None:
+        cv2.drawMarker(out, (int(round(center[0])), int(round(center[1]))), (0, 255, 255), cv2.MARKER_CROSS, 12, 2)
+    if points:
+        for x, y in points:
+            cv2.circle(out, (int(x), int(y)), 3, point_color, -1)
+    return out
+
+
 def draw_contour_points(image: np.ndarray, points: Iterable[Point], color=(255, 0, 0)) -> np.ndarray:
     """@brief Draw a polyline/point contour on an image.
 

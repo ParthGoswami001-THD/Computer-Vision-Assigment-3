@@ -210,7 +210,8 @@ def run_single_case(
                 draw_contour_points(image, scf_result.contour_points),
                 overlay_mask(image, gt_contour, color=(0, 255, 0)),
             ],
-            ["Input", "Sobel", "CoG", "IEPS", f"SCF-{scf_method}", "Ground Truth"],
+            ["Input", "Sobel", "CoG", "IEPS", f"SCF-{scf_method}",
+             "Otsu Proxy Mask" if name.startswith("real_vase") else "Ground Truth"],
         )
         save_image(case_dir / panel_name, panel)
 

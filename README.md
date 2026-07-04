@@ -71,7 +71,7 @@ The main run generates four required author-style cases:
 Other run modes cover:
 
 - the paper-style greedy SCF,
-- paper-comparison approximations for Yuen-style initialization, simple Snake-style contour refinement, and Chen-style gradient-only tracing,
+- optional paper-context approximations for Yuen-style initialization, simple Snake-style contour refinement, and Chen-style gradient-only tracing,
 - SNR-based circle tracing tests at 29.9, 23.9, and 20.3 dB,
 - graph-search SCF as a traditional-CV extension,
 - band-limited curvature-aware graph SCF,
@@ -133,7 +133,6 @@ python main.py --run parameter
 python main.py --run improvement
 python main.py --run vase
 python main.py --run paper-comparison
-python main.py --run paper-validation
 python main.py --run all
 ```
 
@@ -156,10 +155,9 @@ python main.py --run parameter         -> results/tables/parameter_study.csv
 python main.py --run improvement       -> results/tables/improvement_comparison.csv
 python main.py --run vase              -> results/tables/real_vase_results.csv
 python main.py --run paper-comparison  -> results/tables/paper_comparison_results.csv
-python main.py --run paper-validation  -> results/tables/paper_results_validation.csv
 ```
 
-The paper-comparison run also writes presentation-ready tables:
+The optional paper-comparison run also writes presentation-ready tables:
 
 ```text
 results/tables/paper_initial_point_comparison.csv

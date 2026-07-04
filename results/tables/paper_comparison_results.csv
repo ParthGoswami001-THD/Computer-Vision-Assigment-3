@@ -1,18 +1,18 @@
 result_group,case,method,precision,recall,f1,elapsed_ms,point_count,point_accuracy,true_points,neighbor_mean,neighbor_std,noise_snr_db,input_source,note
-initial_point_selection,circle_noisy,yuen_style_initial_points,,,,18.5460,32,1.0,32,13.847885700110227,0.33325911342784686,,synthetic,Yuen-style is fixed-angle farthest-edge approximation.
-initial_point_selection,circle_noisy,ieps_paper_initial_points,,,,9.3992,32,1.0,32,13.861417147443815,0.33333866344997626,,synthetic,Yuen-style is fixed-angle farthest-edge approximation.
-snake_initialization_comparison,circle_noisy,simple_snake_from_yuen_style,1.0,0.46352313167259784,0.6334346504559271,180.3349,32,,,,,,synthetic,Simple greedy Snake-style approximation; not full Kass solver.
-snake_initialization_comparison,circle_noisy,simple_snake_from_ieps_paper,1.0,0.46352313167259784,0.6334346504559271,181.4414,32,,,,,,synthetic,Simple greedy Snake-style approximation; not full Kass solver.
-initial_point_selection,u_shape_noisy,yuen_style_initial_points,,,,23.5526,32,0.90625,29,18.75471751368987,10.33250071288139,,synthetic,Yuen-style is fixed-angle farthest-edge approximation.
-initial_point_selection,u_shape_noisy,ieps_paper_initial_points,,,,14.1865,32,0.78125,25,19.310197455275002,5.572591339609495,,synthetic,Yuen-style is fixed-angle farthest-edge approximation.
-snake_initialization_comparison,u_shape_noisy,simple_snake_from_yuen_style,0.90625,0.2473045822102426,0.3885724717050018,185.3135,32,,,,,,synthetic,Simple greedy Snake-style approximation; not full Kass solver.
-snake_initialization_comparison,u_shape_noisy,simple_snake_from_ieps_paper,0.7911392405063291,0.215633423180593,0.33889689062102857,198.6006,32,,,,,,synthetic,Simple greedy Snake-style approximation; not full Kass solver.
-scf_vs_chen_snr,circle_snr_29_9,chen_style_gradient_only,1.0,1.0,1.0,4.3004,32,1.0,,,,29.9,synthetic_snr,Chen-style uses gradient-only SCF approximation; SNR noise is approximate.
-scf_vs_chen_snr,circle_snr_29_9,proposed_scf_gradient_distance,1.0,1.0,1.0,5.3153,32,1.0,,,,29.9,synthetic_snr,Chen-style uses gradient-only SCF approximation; SNR noise is approximate.
-scf_vs_chen_snr,circle_snr_23_9,chen_style_gradient_only,1.0,1.0,1.0,4.6917,32,1.0,,,,23.9,synthetic_snr,Chen-style uses gradient-only SCF approximation; SNR noise is approximate.
-scf_vs_chen_snr,circle_snr_23_9,proposed_scf_gradient_distance,1.0,1.0,1.0,5.1876,32,1.0,,,,23.9,synthetic_snr,Chen-style uses gradient-only SCF approximation; SNR noise is approximate.
-scf_vs_chen_snr,circle_snr_20_3,chen_style_gradient_only,1.0,1.0,1.0,3.4274,32,1.0,,,,20.3,synthetic_snr,Chen-style uses gradient-only SCF approximation; SNR noise is approximate.
-scf_vs_chen_snr,circle_snr_20_3,proposed_scf_gradient_distance,1.0,1.0,1.0,3.5727,32,1.0,,,,20.3,synthetic_snr,Chen-style uses gradient-only SCF approximation; SNR noise is approximate.
-vase_comparison,real_vase_or_fallback,simple_snake_kass_style,0.58125,0.2193798449612403,0.318535552193646,205.0206,32,0.5625,,,,,data\vase.png,mask_source=otsu_estimated_mask; Snake/Chen are compact approximations.
-vase_comparison,real_vase_or_fallback,chen_style_gradient_only,0.5563157894736842,0.7922480620155039,0.6536436603909443,7.1028,32,0.5625,,,,,data\vase.png,mask_source=otsu_estimated_mask; Snake/Chen are compact approximations.
-vase_comparison,real_vase_or_fallback,proposed_scf_gradient_distance,0.5569280343716434,0.7922480620155039,0.6540660735015401,5.9226,32,0.5625,,,,,data\vase.png,mask_source=otsu_estimated_mask; Snake/Chen are compact approximations.
+initial_point_selection,circle_noisy,yuen_style_initial_points,,,,19.7324,32,1.0,32,13.847885700110227,0.33325911342784686,,synthetic,Yuen-style is fixed-angle farthest-edge approximation.
+initial_point_selection,circle_noisy,ieps_paper_initial_points,,,,16.4955,32,1.0,32,13.861417147443815,0.33333866344997626,,synthetic,Yuen-style is fixed-angle farthest-edge approximation.
+snake_initialization_comparison,circle_noisy,simple_snake_from_yuen_style,1.0,0.46352313167259784,0.6334346504559271,144.3401,32,,,,,,synthetic,Simple greedy Snake-style approximation; not full Kass solver.
+snake_initialization_comparison,circle_noisy,simple_snake_from_ieps_paper,1.0,0.46352313167259784,0.6334346504559271,148.4812,32,,,,,,synthetic,Simple greedy Snake-style approximation; not full Kass solver.
+initial_point_selection,u_shape_noisy,yuen_style_initial_points,,,,17.1248,32,0.90625,29,18.75471751368987,10.33250071288139,,synthetic,Yuen-style is fixed-angle farthest-edge approximation.
+initial_point_selection,u_shape_noisy,ieps_paper_initial_points,,,,8.5062,32,0.78125,25,19.310197455275002,5.572591339609495,,synthetic,Yuen-style is fixed-angle farthest-edge approximation.
+snake_initialization_comparison,u_shape_noisy,simple_snake_from_yuen_style,0.90625,0.2473045822102426,0.3885724717050018,156.5822,32,,,,,,synthetic,Simple greedy Snake-style approximation; not full Kass solver.
+snake_initialization_comparison,u_shape_noisy,simple_snake_from_ieps_paper,0.7911392405063291,0.215633423180593,0.33889689062102857,156.4506,32,,,,,,synthetic,Simple greedy Snake-style approximation; not full Kass solver.
+scf_vs_chen_snr,circle_snr_29_9,chen_style_gradient_only,1.0,1.0,1.0,1.9373,32,1.0,,,,29.9,synthetic_snr,Chen-style uses gradient-only SCF approximation; SNR noise is approximate.
+scf_vs_chen_snr,circle_snr_29_9,proposed_scf_gradient_distance,1.0,1.0,1.0,2.4125,32,1.0,,,,29.9,synthetic_snr,Chen-style uses gradient-only SCF approximation; SNR noise is approximate.
+scf_vs_chen_snr,circle_snr_23_9,chen_style_gradient_only,1.0,1.0,1.0,1.9658,32,1.0,,,,23.9,synthetic_snr,Chen-style uses gradient-only SCF approximation; SNR noise is approximate.
+scf_vs_chen_snr,circle_snr_23_9,proposed_scf_gradient_distance,1.0,1.0,1.0,2.1014,32,1.0,,,,23.9,synthetic_snr,Chen-style uses gradient-only SCF approximation; SNR noise is approximate.
+scf_vs_chen_snr,circle_snr_20_3,chen_style_gradient_only,1.0,1.0,1.0,3.1234,32,1.0,,,,20.3,synthetic_snr,Chen-style uses gradient-only SCF approximation; SNR noise is approximate.
+scf_vs_chen_snr,circle_snr_20_3,proposed_scf_gradient_distance,1.0,1.0,1.0,2.9925,32,1.0,,,,20.3,synthetic_snr,Chen-style uses gradient-only SCF approximation; SNR noise is approximate.
+vase_comparison,real_vase_or_fallback,simple_snake_kass_style,0.967741935483871,0.29514824797843664,0.45233915108953837,171.3421,32,0.96875,,,,,data\vase.png,mask_source=otsu_estimated_mask; Snake/Chen are compact approximations.
+vase_comparison,real_vase_or_fallback,chen_style_gradient_only,0.9479733817301875,0.9272237196765498,0.9374837498445638,4.3262,32,0.96875,,,,,data\vase.png,mask_source=otsu_estimated_mask; Snake/Chen are compact approximations.
+vase_comparison,real_vase_or_fallback,proposed_scf_gradient_distance,0.9503676470588235,0.9258760107816711,0.9379619775477921,4.7901,32,0.96875,,,,,data\vase.png,mask_source=otsu_estimated_mask; Snake/Chen are compact approximations.

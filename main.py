@@ -60,15 +60,13 @@ RUN_ORDER = [
     "improvement",
     "vase",
     "paper-comparison",
-    "paper-validation",
 ]
 RUN_DESCRIPTIONS = {
     "main": "Core synthetic circle/U-shape IEPS + SCF results.",
     "parameter": "Reproducibility parameter study inside IEPS + SCF.",
     "improvement": "Paper IEPS versus improved IEPS extension.",
     "vase": "Real-vase path, or clearly labeled fallback if no vase image exists.",
-    "paper-comparison": "Yuen-style, Snake-style, Chen-style, SNR, and vase comparison approximations.",
-    "paper-validation": "Figure/table-level validation summary for the paper experiments.",
+    "paper-comparison": "Optional paper-context approximation tables for Yuen/Snake/Chen-style comparisons.",
     "all": "Run and write every result table and figure set.",
 }
 
@@ -409,120 +407,6 @@ def run_real_vase_test(save_outputs: bool = True) -> pd.DataFrame:
         )
         rows.append(row)
 
-    return pd.DataFrame(rows)
-
-
-def run_paper_results_validation_summary(
-    main_results: pd.DataFrame,
-    improvement_results: pd.DataFrame,
-    real_vase_results: pd.DataFrame,
-    paper_comparison_results: pd.DataFrame,
-) -> pd.DataFrame:
-    """@brief Summarize which paper results were reproduced or only contextualized.
-
-    @param main_results DataFrame from run_main_experiments.
-    @param improvement_results DataFrame from run_improvement_comparison.
-    @param real_vase_results DataFrame from run_real_vase_test.
-    @param paper_comparison_results DataFrame from run_paper_comparison_experiments.
-    @return Paper-result validation summary DataFrame.
-    """
-    greedy = main_results[main_results["scf_method"] == "greedy"].set_index("case")
-    circle_noisy = greedy.loc["circle_noisy"]
-    u_noisy = greedy.loc["u_shape_noisy"]
-    u_band = main_results[(main_results["case"] == "u_shape_noisy") & (main_results["scf_method"] == "band_graph")].iloc[0]
-    improved_u_noisy = improvement_results[improvement_results["case"] == "u_shape_noisy"].iloc[0]
-    vase_sources = sorted(set(str(v) for v in real_vase_results["input_source"].tolist()))
-    comparison_groups = sorted(set(str(v) for v in paper_comparison_results["result_group"].tolist()))
-
-    rows: List[Dict[str, str]] = [
-        {
-            "paper_item": "Fig. 5 synthetic circle and U-shape images",
-            "paper_reported": "Noise-free and Gaussian-noisy man-made circle and U-shape images.",
-            "validation_status": "reproduced_in_scope",
-            "project_measurement": "Generated circle_clean, circle_noisy, u_shape_clean, and u_shape_noisy.",
-            "evidence": "results/<case>/original.png",
-            "note": "Synthetic geometry is author-style but not pixel-identical to the paper.",
-        },
-        {
-            "paper_item": "Fig. 6 / Table II IEPS initial point accuracy",
-            "paper_reported": "4 scan lines, 3 iterations, threshold 64, 32 points. IEPS: circle 22/32, U-shape 28/32.",
-            "validation_status": "implemented_with_yuen_style_comparison",
-            "project_measurement": (
-                f"paper IEPS circle_noisy {int(circle_noisy['ieps_accuracy'] * circle_noisy['ieps_points'])}/"
-                f"{int(circle_noisy['ieps_points'])}; u_shape_noisy "
-                f"{int(u_noisy['ieps_accuracy'] * u_noisy['ieps_points'])}/{int(u_noisy['ieps_points'])}. "
-                f"Improved IEPS u_shape_noisy {int(improved_u_noisy['improved_ieps_accuracy'] * improved_u_noisy['improved_ieps_points'])}/"
-                f"{int(improved_u_noisy['improved_ieps_points'])}."
-            ),
-            "evidence": "results/tables/main_results.csv; results/tables/paper_comparison_results.csv",
-            "note": "Yuen-style fixed-angle baseline is implemented as an approximation from the paper description.",
-        },
-        {
-            "paper_item": "Table III neighboring IEPS distance mean/std",
-            "paper_reported": "IEPS circle mean/std 19.492/3.923; U-shape mean/std 17.893/4.438.",
-            "validation_status": "metric_reproduced_values_differ",
-            "project_measurement": (
-                f"circle_noisy mean/std {circle_noisy['neighbor_mean']:.3f}/{circle_noisy['neighbor_std']:.3f}; "
-                f"u_shape_noisy mean/std {u_noisy['neighbor_mean']:.3f}/{u_noisy['neighbor_std']:.3f}."
-            ),
-            "evidence": "results/tables/main_results.csv",
-            "note": "Values differ because the generated shapes are not the exact paper images.",
-        },
-        {
-            "paper_item": "Fig. 7 Snake with Yuen vs IEPS initial points",
-            "paper_reported": "Snake converges better when initialized by IEPS than by Yuen's method.",
-            "validation_status": "implemented_with_simple_snake_approximation",
-            "project_measurement": "Simple Snake-style contours are generated from both Yuen-style and IEPS initial points.",
-            "evidence": "results/tables/paper_comparison_results.csv; results/paper_comparisons/",
-            "note": "This is a compact greedy Snake approximation, not the full Kass variational solver.",
-        },
-        {
-            "paper_item": "Fig. 8 real vase IEPS/Snake comparison",
-            "paper_reported": "IEPS selects better initial points on a real vase image; Snake result improves.",
-            "validation_status": "real_image_path_and_snake_approximation_implemented",
-            "project_measurement": f"Input source used in current run: {', '.join(vase_sources)}.",
-            "evidence": "results/tables/real_vase_results.csv; results/tables/paper_comparison_results.csv",
-            "note": "Place data/vase.png and optional data/vase_mask.png to run on a real vase image; current run may use fallback.",
-        },
-        {
-            "paper_item": "Table IV SCF true-positive ratio vs Chen",
-            "paper_reported": "Chen: 80-81%; proposed SCF: 96-98% at listed SNR values.",
-            "validation_status": "implemented_with_chen_style_approximation",
-            "project_measurement": (
-                f"circle_noisy greedy SCF recall/F1 {circle_noisy['recall']:.3f}/{circle_noisy['f1']:.3f}; "
-                f"u_shape_noisy greedy F1 {u_noisy['f1']:.3f}; band_graph F1 {u_band['f1']:.3f}; "
-                f"target segments {int(circle_noisy['target_reached_segments'])}/{int(circle_noisy['total_segments'])} for circle_noisy."
-            ),
-            "evidence": "results/tables/main_results.csv; results/tables/paper_comparison_results.csv",
-            "note": "Chen-style tracing is implemented as gradient-only SCF approximation; exact Chen algorithm is not claimed.",
-        },
-        {
-            "paper_item": "Fig. 9 SNR=29.9 segmental tracing result",
-            "paper_reported": "Proposed SCF follows the circle boundary more continuously than Chen in the zoomed region.",
-            "validation_status": "implemented_with_approximate_snr_noise",
-            "project_measurement": "SNR=29.9, 23.9, and 20.3 circle tracing rows are generated for Chen-style and proposed SCF.",
-            "evidence": "results/tables/paper_comparison_results.csv; results/paper_comparisons/",
-            "note": "SNR noise is generated from image variance and may not match the paper's exact noise image.",
-        },
-        {
-            "paper_item": "Fig. 10 / Table V real vase contour and execution time",
-            "paper_reported": "Paper reports Kass 363 ms, Chen 57 ms, proposed SCF 37 ms on vase.",
-            "validation_status": "implemented_with_approximation_methods",
-            "project_measurement": (
-                "Current vase/fallback comparison records simple Snake-style, Chen-style, and proposed SCF runtimes."
-            ),
-            "evidence": "results/tables/paper_comparison_results.csv; results/tables/real_vase_results.csv",
-            "note": "Exact Table V still requires the original vase image and exact Kass/Chen implementations.",
-        },
-        {
-            "paper_item": "Conclusion: IEPS initializes contour extraction automatically",
-            "paper_reported": "IEPS automatically selects initial edge points for SCF or active contour models.",
-            "validation_status": "validated",
-            "project_measurement": f"IEPS outputs 32 points in paper mode; comparison groups generated: {', '.join(comparison_groups)}.",
-            "evidence": "src/ieps.py; src/ieps_improved.py; results/tables/main_results.csv",
-            "note": "A simple Snake-style active contour approximation is implemented for comparison.",
-        },
-    ]
     return pd.DataFrame(rows)
 
 
@@ -1118,19 +1002,6 @@ def run_cli(args: argparse.Namespace) -> None:
             print("Presentation comparison tables:")
             for path in written_tables.values():
                 print(f"  {path.relative_to(BASE_DIR)}")
-        elif run_name == "paper-validation":
-            paper_validation_results = run_paper_results_validation_summary(
-                get_main_results(full=True),
-                get_improvement_results(),
-                get_real_vase_results(write_images=False),
-                get_paper_comparison_results(write_images=False),
-            )
-            _write_and_print_table(
-                "Paper result validation",
-                paper_validation_results,
-                "paper_results_validation.csv",
-                ["paper_item", "validation_status", "evidence"],
-            )
 
     print(f"\nDone. Selected run(s): {', '.join(requested_runs)}")
     print("Results directory:", RESULTS_DIR)

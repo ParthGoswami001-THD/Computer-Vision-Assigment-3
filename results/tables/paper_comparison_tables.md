@@ -13,21 +13,21 @@ These tables are presentation-ready summaries derived from `paper_comparison_res
 
 | case | yuen_snake_precision | yuen_snake_recall | yuen_snake_f1 | yuen_snake_ms | ieps_snake_precision | ieps_snake_recall | ieps_snake_f1 | ieps_snake_ms |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| circle_noisy | 1.0000 | 0.4635 | 0.6334 | 180.3349 | 1.0000 | 0.4635 | 0.6334 | 181.4414 |
-| u_shape_noisy | 0.9062 | 0.2473 | 0.3886 | 185.3135 | 0.7911 | 0.2156 | 0.3389 | 198.6006 |
+| circle_noisy | 1.0000 | 0.4635 | 0.6334 | 144.3401 | 1.0000 | 0.4635 | 0.6334 | 148.4812 |
+| u_shape_noisy | 0.9062 | 0.2473 | 0.3886 | 156.5822 | 0.7911 | 0.2156 | 0.3389 | 156.4506 |
 
 ## Paper Scf Chen Comparison
 
 | snr_db | chen_precision | chen_recall | chen_f1 | chen_ms | proposed_precision | proposed_recall | proposed_f1 | proposed_ms |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 29.9000 | 1.0000 | 1.0000 | 1.0000 | 4.3004 | 1.0000 | 1.0000 | 1.0000 | 5.3153 |
-| 23.9000 | 1.0000 | 1.0000 | 1.0000 | 4.6917 | 1.0000 | 1.0000 | 1.0000 | 5.1876 |
-| 20.3000 | 1.0000 | 1.0000 | 1.0000 | 3.4274 | 1.0000 | 1.0000 | 1.0000 | 3.5727 |
+| 29.9000 | 1.0000 | 1.0000 | 1.0000 | 1.9373 | 1.0000 | 1.0000 | 1.0000 | 2.4125 |
+| 23.9000 | 1.0000 | 1.0000 | 1.0000 | 1.9658 | 1.0000 | 1.0000 | 1.0000 | 2.1014 |
+| 20.3000 | 1.0000 | 1.0000 | 1.0000 | 3.1234 | 1.0000 | 1.0000 | 1.0000 | 2.9925 |
 
 ## Paper Vase Method Comparison
 
 | method | input_source | point_accuracy | precision | recall | f1 | elapsed_ms | note |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Simple Snake-style | data\vase.png | 0.5625 | 0.5813 | 0.2194 | 0.3185 | 205.0206 | mask_source=otsu_estimated_mask; Snake/Chen are compact approximations. |
-| Chen-style | data\vase.png | 0.5625 | 0.5563 | 0.7922 | 0.6536 | 7.1028 | mask_source=otsu_estimated_mask; Snake/Chen are compact approximations. |
-| Proposed SCF | data\vase.png | 0.5625 | 0.5569 | 0.7922 | 0.6541 | 5.9226 | mask_source=otsu_estimated_mask; Snake/Chen are compact approximations. |
+| Simple Snake-style | data\vase.png | 0.9688 | 0.9677 | 0.2951 | 0.4523 | 171.3421 | mask_source=otsu_estimated_mask; Snake/Chen are compact approximations. |
+| Chen-style | data\vase.png | 0.9688 | 0.9480 | 0.9272 | 0.9375 | 4.3262 | mask_source=otsu_estimated_mask; Snake/Chen are compact approximations. |
+| Proposed SCF | data\vase.png | 0.9688 | 0.9504 | 0.9259 | 0.9380 | 4.7901 | mask_source=otsu_estimated_mask; Snake/Chen are compact approximations. |

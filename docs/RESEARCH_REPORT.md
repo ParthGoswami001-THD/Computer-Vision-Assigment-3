@@ -139,7 +139,7 @@ I do not treat these as a separate bug-fix experiment in the final results. They
 
 The experimental section of the paper reports two main results: first, IEPS is compared with Yuen's initialization method [2]; second, SCF is compared with Chen's contour tracing method [4]. The paper also shows Snake results using initial points from Yuen and IEPS [3], plus a real vase image test.
 
-This project validates the paper direction end to end: the author-style synthetic shapes, IEPS with 4 scan lines and 3 iterations, threshold 64, 32 initial edge points, SCF between neighboring IEPS points, true-edge comparison, runtime, SNR-based noisy circle tests, and the real-vase test path. I also added compact Yuen-style, Snake-style, and Chen-style comparison baselines so the paper's experimental structure can run from one command. These baselines are approximations from the paper description, not exact source-code reproductions of the cited methods.
+This project validates the paper direction end to end: the author-style synthetic shapes, IEPS with 4 scan lines and 3 iterations, threshold 64, 32 initial edge points, SCF between neighboring IEPS points, true-edge comparison, runtime, SNR-based noisy circle tests, and the real-vase test path. As secondary paper context, I also added compact Yuen-style, Snake-style, and Chen-style comparison baselines. These baselines are approximations from the paper description, not exact source-code reproductions of the cited methods, and they are not the main contribution.
 
 | Paper experiment | Paper reported result | Validation in this project |
 |---|---|---|
@@ -153,16 +153,10 @@ This project validates the paper direction end to end: the author-style syntheti
 
 The closest direct reproduction is still the IEPS setup and synthetic-shape validation. The comparison with Yuen, Snake, and Chen is now executable, but should be described as approximation baselines because the paper does not provide enough implementation detail to reproduce those cited methods exactly.
 
-A complete figure/table-level validation summary is also saved as:
+This validation is a one-time interpretation after implementing the method, not a separate runtime experiment. The report text above explains which paper results are reproduced, which are approximate comparisons, and where exact reproduction is limited by missing paper details. `paper_comparison_results.csv` is kept only as the raw long-form measurement log. For the report and presentation, the same data is exported as clean comparison tables:
 
 ```text
-results/tables/paper_results_validation.csv
 results/tables/paper_comparison_results.csv
-```
-
-The validation table marks each paper item as reproduced, partially validated, or implemented with an approximation, with the project evidence path for each row. `paper_comparison_results.csv` is the raw long-form measurement log. For the report and presentation, the same data is also exported as clean comparison tables:
-
-```text
 results/tables/paper_initial_point_comparison.csv
 results/tables/paper_snake_initialization_comparison.csv
 results/tables/paper_scf_chen_comparison.csv

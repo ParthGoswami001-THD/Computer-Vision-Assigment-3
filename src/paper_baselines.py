@@ -4,8 +4,9 @@
 The assigned paper compares IEPS/SCF with Yuen's initialization, Snake/Kass
 active contours, and Chen's contour tracing. The full implementation details of
 those comparison methods are not all present in the paper excerpt, so this file
-implements compact, clearly labeled traditional-CV approximations for the
-paper-style comparison tables.
+implements compact, clearly labeled traditional-CV approximations for optional
+paper-context comparison tables. These functions are not the core contribution
+and should not be described as exact reproductions of the cited methods.
 """
 
 from __future__ import annotations

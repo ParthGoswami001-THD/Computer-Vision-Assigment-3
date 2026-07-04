@@ -8,14 +8,14 @@ Table II - initial edge points,u_shape_noisy,point accuracy,1.0000,1.0000,,,,
 Table III - neighboring point spacing,u_shape_noisy,mean distance,15.597,16.322,,,,
 Table III - neighboring point spacing,u_shape_noisy,std distance,6.436,4.128,,,,
 Fig. 7 - Snake initialization,circle_noisy,F1,0.6334,0.6334,,,approximation,"Simple greedy Snake-style approximation, not the full Kass solver."
-Fig. 7 - Snake initialization,circle_noisy,runtime,101.7 ms,101.9 ms,,,approximation,
+Fig. 7 - Snake initialization,circle_noisy,runtime,125.2 ms,119.1 ms,,,approximation,
 Fig. 7 - Snake initialization,u_shape_noisy,F1,0.5410,0.5526,,,approximation,"Simple greedy Snake-style approximation, not the full Kass solver."
-Fig. 7 - Snake initialization,u_shape_noisy,runtime,108.5 ms,113.9 ms,,,approximation,
+Fig. 7 - Snake initialization,u_shape_noisy,runtime,120.1 ms,120.5 ms,,,approximation,
 Table IV - SCF tracing,SNR=29.9 dB,F1,,,1.0000,1.0000,,Chen-style baseline and SNR noise are documented approximations.
-Table IV - SCF tracing,SNR=29.9 dB,runtime,,,1.5 ms,1.6 ms,,
+Table IV - SCF tracing,SNR=29.9 dB,runtime,,,2.0 ms,2.8 ms,,
 Table IV - SCF tracing,SNR=23.9 dB,F1,,,1.0000,1.0000,,Chen-style baseline and SNR noise are documented approximations.
-Table IV - SCF tracing,SNR=23.9 dB,runtime,,,1.7 ms,2.0 ms,,
+Table IV - SCF tracing,SNR=23.9 dB,runtime,,,1.8 ms,2.0 ms,,
 Table IV - SCF tracing,SNR=20.3 dB,F1,,,1.0000,1.0000,,Chen-style baseline and SNR noise are documented approximations.
-Table IV - SCF tracing,SNR=20.3 dB,runtime,,,1.8 ms,1.9 ms,,
+Table IV - SCF tracing,SNR=20.3 dB,runtime,,,1.7 ms,2.0 ms,,
 Fig. 10 / Table V - real vase,data\vase.png,F1,,,0.9375,0.9380,0.4523,mask_source=otsu_estimated_mask; Snake/Chen are compact approximations.
-Fig. 10 / Table V - real vase,data\vase.png,runtime,,,2.7 ms,2.7 ms,96.3 ms,
+Fig. 10 / Table V - real vase,data\vase.png,runtime,,,3.0 ms,3.5 ms,112.8 ms,

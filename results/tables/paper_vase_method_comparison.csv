@@ -1,4 +1,4 @@
 method,input_source,point_accuracy,precision,recall,f1,elapsed_ms,note
-Simple Snake-style,data\vase.png,0.9688,0.9677,0.2951,0.4523,96.3192,mask_source=otsu_estimated_mask; Snake/Chen are compact approximations.
-Chen-style,data\vase.png,0.9688,0.9480,0.9272,0.9375,2.7348,mask_source=otsu_estimated_mask; Snake/Chen are compact approximations.
-Proposed SCF,data\vase.png,0.9688,0.9504,0.9259,0.9380,2.7363,mask_source=otsu_estimated_mask; Snake/Chen are compact approximations.
+Simple Snake-style,data\vase.png,0.9688,0.9677,0.2951,0.4523,112.8053,mask_source=otsu_estimated_mask; Snake/Chen are compact approximations.
+Chen-style,data\vase.png,0.9688,0.9480,0.9272,0.9375,2.9601,mask_source=otsu_estimated_mask; Snake/Chen are compact approximations.
+Proposed SCF,data\vase.png,0.9688,0.9504,0.9259,0.9380,3.4635,mask_source=otsu_estimated_mask; Snake/Chen are compact approximations.

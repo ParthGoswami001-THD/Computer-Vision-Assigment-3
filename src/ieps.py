@@ -193,7 +193,9 @@ def run_ieps(
         center = compute_center_of_gravity(image, mode=center_mode)
     height, width = image.shape[:2]
     if default_scan_distance is None:
-        default_scan_distance = min(height, width) / 2.0
+        # Paper Eq. (7) leaves D undefined; D = min(h, w) / 4 gives the same
+        # radius sequence as the earlier min(h, w) / 2 with exponent p.
+        default_scan_distance = min(height, width) / 4.0
 
     debug: Dict[str, object] = {
         "center_mode": center_mode,
@@ -230,7 +232,7 @@ def run_ieps(
     for iteration in range(1, iterations + 1):
         if len(points) < 2:
             break
-        radius = max(3.0, default_scan_distance / (2.0 ** iteration))
+        radius = max(3.0, default_scan_distance / (2.0 ** (iteration - 1)))  # Eq. (7): d = D / 2^(p-1)
         next_points: List[Point] = []
         iteration_lines: List[List[Point]] = []
 

@@ -204,7 +204,7 @@ python main.py --run main --case ...   -> results/tables/main_results_selected.c
 python main.py --run parameter         -> results/tables/parameter_study.csv
 python main.py --run improvement       -> results/tables/improvement_comparison.csv
 python main.py --run vase              -> results/tables/real_vase_results.csv
-python main.py --run paper-comparison  -> results/tables/paper_comparison_results.csv
+python main.py --run paper-comparison  -> results/tables/paper_comparison_results.csv + paper_comparison_results_raw.csv
 ```
 
 Each case directory contains the plan-style debug and result images:

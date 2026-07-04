@@ -156,10 +156,11 @@ This project validates the paper direction end to end: the author-style syntheti
 
 The closest direct reproduction is still the IEPS setup and synthetic-shape validation. The comparison with Yuen, Snake, and Chen is executable, but should be described as approximation baselines because the paper does not provide enough implementation detail to reproduce those cited methods exactly. In their current form these approximations validate the experimental structure, not the exact paper numbers: the Yuen-style approximation ties IEPS on initial-point accuracy, the simple Snake-style U-shape result is only slightly better with IEPS, and Chen-style tracing ties the proposed SCF at every tested SNR. For the presentation, these tables are structural context; the strongest reproduction evidence comes from the IEPS + SCF pipeline and its own validation.
 
-This validation is a one-time interpretation after implementing the method, not a separate runtime experiment. The report text above explains which paper results are reproduced, which are approximate comparisons, and where exact reproduction is limited by missing paper details. `paper_comparison_results.csv` is kept only as the raw long-form measurement log. For the report and presentation, the same data is exported as clean comparison tables:
+This validation is a one-time interpretation after implementing the method, not a separate runtime experiment. The report text above explains which paper results are reproduced, which are approximate comparisons, and where exact reproduction is limited by missing paper details. `paper_comparison_results.csv` is a paper-style row/column summary table, while `paper_comparison_results_raw.csv` keeps the raw long-form measurement log for traceability. For the report and presentation, the same data is also exported as focused comparison tables:
 
 ```text
 results/tables/paper_comparison_results.csv
+results/tables/paper_comparison_results_raw.csv
 results/tables/paper_initial_point_comparison.csv
 results/tables/paper_snake_initialization_comparison.csv
 results/tables/paper_scf_chen_comparison.csv

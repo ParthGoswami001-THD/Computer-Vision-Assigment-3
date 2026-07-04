@@ -812,6 +812,173 @@ def build_paper_comparison_tables(raw_results: pd.DataFrame) -> Dict[str, pd.Dat
     return tables
 
 
+def _paper_cell(value: object, decimals: int = 4) -> str:
+    """@brief Format a scalar value for a compact paper-style CSV cell."""
+    if value == "" or pd.isna(value):
+        return ""
+    return f"{float(value):.{decimals}f}"
+
+
+def _paper_ms_cell(value: object) -> str:
+    """@brief Format elapsed time for a compact paper-style CSV cell."""
+    if value == "" or pd.isna(value):
+        return ""
+    return f"{float(value):.1f} ms"
+
+
+def _paper_point_ratio(row: pd.Series) -> str:
+    """@brief Format true-positive initial points as true/total."""
+    return f"{int(float(row['true_points']))}/{int(float(row['point_count']))}"
+
+
+def _paper_summary_row(
+    paper_section: str,
+    case_or_condition: str,
+    metric: str,
+    *,
+    yuen_style: str = "",
+    ieps: str = "",
+    chen_style: str = "",
+    proposed_scf: str = "",
+    simple_snake_style: str = "",
+    note: str = "",
+) -> Dict[str, str]:
+    """@brief Create one paper-style comparison row with stable columns."""
+    return {
+        "paper_section": paper_section,
+        "case_or_condition": case_or_condition,
+        "metric": metric,
+        "yuen_style": yuen_style,
+        "ieps": ieps,
+        "chen_style": chen_style,
+        "proposed_scf": proposed_scf,
+        "simple_snake_style": simple_snake_style,
+        "note": note,
+    }
+
+
+def build_paper_style_comparison_results(raw_results: pd.DataFrame) -> pd.DataFrame:
+    """@brief Convert raw paper-comparison runs into one row-column table.
+
+    This table mirrors the paper's style more closely than the raw measurement
+    log: each row is a paper figure/table item, and each method has its own
+    column. The detailed long-form data remains available separately.
+
+    @param raw_results Raw DataFrame from run_paper_comparison_experiments.
+    @return Compact paper-style summary DataFrame.
+    """
+    rows: List[Dict[str, str]] = []
+
+    for case in ["circle_noisy", "u_shape_noisy"]:
+        yuen = _single_comparison_row(raw_results, "initial_point_selection", case, "yuen_style_initial_points")
+        ieps = _single_comparison_row(raw_results, "initial_point_selection", case, "ieps_paper_initial_points")
+        rows.append(_paper_summary_row(
+            "Table II - initial edge points",
+            case,
+            "true points / total",
+            yuen_style=_paper_point_ratio(yuen),
+            ieps=_paper_point_ratio(ieps),
+            note="Yuen-style is an approximation from the paper description.",
+        ))
+        rows.append(_paper_summary_row(
+            "Table II - initial edge points",
+            case,
+            "point accuracy",
+            yuen_style=_paper_cell(yuen["point_accuracy"]),
+            ieps=_paper_cell(ieps["point_accuracy"]),
+        ))
+        rows.append(_paper_summary_row(
+            "Table III - neighboring point spacing",
+            case,
+            "mean distance",
+            yuen_style=_paper_cell(yuen["neighbor_mean"], decimals=3),
+            ieps=_paper_cell(ieps["neighbor_mean"], decimals=3),
+        ))
+        rows.append(_paper_summary_row(
+            "Table III - neighboring point spacing",
+            case,
+            "std distance",
+            yuen_style=_paper_cell(yuen["neighbor_std"], decimals=3),
+            ieps=_paper_cell(ieps["neighbor_std"], decimals=3),
+        ))
+
+    for case in ["circle_noisy", "u_shape_noisy"]:
+        yuen_snake = _single_comparison_row(
+            raw_results,
+            "snake_initialization_comparison",
+            case,
+            "simple_snake_from_yuen_style",
+        )
+        ieps_snake = _single_comparison_row(
+            raw_results,
+            "snake_initialization_comparison",
+            case,
+            "simple_snake_from_ieps_paper",
+        )
+        rows.append(_paper_summary_row(
+            "Fig. 7 - Snake initialization",
+            case,
+            "F1",
+            yuen_style=_paper_cell(yuen_snake["f1"]),
+            ieps=_paper_cell(ieps_snake["f1"]),
+            simple_snake_style="approximation",
+            note="Simple greedy Snake-style approximation, not the full Kass solver.",
+        ))
+        rows.append(_paper_summary_row(
+            "Fig. 7 - Snake initialization",
+            case,
+            "runtime",
+            yuen_style=_paper_ms_cell(yuen_snake["elapsed_ms"]),
+            ieps=_paper_ms_cell(ieps_snake["elapsed_ms"]),
+            simple_snake_style="approximation",
+        ))
+
+    for snr_db in [29.9, 23.9, 20.3]:
+        case = f"circle_snr_{str(snr_db).replace('.', '_')}"
+        chen = _single_comparison_row(raw_results, "scf_vs_chen_snr", case, "chen_style_gradient_only")
+        proposed = _single_comparison_row(raw_results, "scf_vs_chen_snr", case, "proposed_scf_gradient_distance")
+        rows.append(_paper_summary_row(
+            "Table IV - SCF tracing",
+            f"SNR={snr_db:.1f} dB",
+            "F1",
+            chen_style=_paper_cell(chen["f1"]),
+            proposed_scf=_paper_cell(proposed["f1"]),
+            note="Chen-style baseline and SNR noise are documented approximations.",
+        ))
+        rows.append(_paper_summary_row(
+            "Table IV - SCF tracing",
+            f"SNR={snr_db:.1f} dB",
+            "runtime",
+            chen_style=_paper_ms_cell(chen["elapsed_ms"]),
+            proposed_scf=_paper_ms_cell(proposed["elapsed_ms"]),
+        ))
+
+    vase_case = "real_vase_or_fallback"
+    snake = _single_comparison_row(raw_results, "vase_comparison", vase_case, "simple_snake_kass_style")
+    chen = _single_comparison_row(raw_results, "vase_comparison", vase_case, "chen_style_gradient_only")
+    proposed = _single_comparison_row(raw_results, "vase_comparison", vase_case, "proposed_scf_gradient_distance")
+    input_source = str(proposed["input_source"])
+    rows.append(_paper_summary_row(
+        "Fig. 10 / Table V - real vase",
+        input_source,
+        "F1",
+        chen_style=_paper_cell(chen["f1"]),
+        proposed_scf=_paper_cell(proposed["f1"]),
+        simple_snake_style=_paper_cell(snake["f1"]),
+        note=str(proposed["note"]),
+    ))
+    rows.append(_paper_summary_row(
+        "Fig. 10 / Table V - real vase",
+        input_source,
+        "runtime",
+        chen_style=_paper_ms_cell(chen["elapsed_ms"]),
+        proposed_scf=_paper_ms_cell(proposed["elapsed_ms"]),
+        simple_snake_style=_paper_ms_cell(snake["elapsed_ms"]),
+    ))
+
+    return pd.DataFrame(rows)
+
+
 def _markdown_value(value: object) -> str:
     """@brief Format a value for generated Markdown tables."""
     if pd.isna(value):
@@ -850,7 +1017,7 @@ def write_paper_comparison_tables(raw_results: pd.DataFrame) -> Dict[str, Path]:
     markdown_sections = [
         "# Paper Comparison Tables",
         "",
-        "These tables are presentation-ready summaries derived from `paper_comparison_results.csv`.",
+        "These tables are presentation-ready summaries derived from `paper_comparison_results_raw.csv`.",
     ]
     for filename, table in tables.items():
         title = filename.replace(".csv", "").replace("_", " ").title()
@@ -1048,14 +1215,30 @@ def run_cli(args: argparse.Namespace) -> None:
                 ["case", "input_source", "mask_source", "ieps_mode", "scf_method", "ieps_points", "f1", "total_ms"],
             )
         elif run_name == "paper-comparison":
-            paper_comparison_results = get_paper_comparison_results(write_images=save_outputs)
+            paper_comparison_raw = get_paper_comparison_results(write_images=save_outputs)
             _write_and_print_table(
-                "Paper comparison experiments",
-                paper_comparison_results,
-                "paper_comparison_results.csv",
+                "Raw paper comparison log",
+                paper_comparison_raw,
+                "paper_comparison_results_raw.csv",
                 ["result_group", "case", "method", "point_accuracy", "f1", "elapsed_ms"],
             )
-            written_tables = write_paper_comparison_tables(paper_comparison_results)
+            paper_comparison_results = build_paper_style_comparison_results(paper_comparison_raw)
+            _write_and_print_table(
+                "Paper-style comparison table",
+                paper_comparison_results,
+                "paper_comparison_results.csv",
+                [
+                    "paper_section",
+                    "case_or_condition",
+                    "metric",
+                    "yuen_style",
+                    "ieps",
+                    "chen_style",
+                    "proposed_scf",
+                    "simple_snake_style",
+                ],
+            )
+            written_tables = write_paper_comparison_tables(paper_comparison_raw)
             print("Presentation comparison tables:")
             for path in written_tables.values():
                 print(f"  {path.relative_to(BASE_DIR)}")

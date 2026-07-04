@@ -246,8 +246,8 @@ The improved IEPS comparison is especially important:
 |---|---:|---:|
 | circle_clean | 1.0000 | 1.0000 |
 | circle_noisy | 1.0000 | 1.0000 |
-| u_shape_clean | 0.6135 | 0.7004 |
-| u_shape_noisy | 0.5908 | 0.6965 |
+| u_shape_clean | 0.9412 | 0.9975 |
+| u_shape_noisy | 0.9482 | 0.9987 |
 
 ## Improvement Ideas That Stay Within Traditional CV
 

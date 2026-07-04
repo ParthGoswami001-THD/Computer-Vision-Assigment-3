@@ -141,12 +141,12 @@ The parameter study stays inside IEPS and SCF:
 
 The circle cases reproduce well. The paper-style IEPS + greedy SCF reaches perfect F1 on the clean and noisy circle images in the current synthetic setup.
 
-The U-shape is the more interesting case. It exposes two problems that are easy to miss from the paper description:
+The U-shape is the more interesting case. After matching the paper's sloped-shoulder, narrow-notch, rounded-bottom silhouette, the paper-style method performs much better than it did on the earlier rectangular placeholder. It still exposes two problems that are easy to miss from the paper description:
 
 1. The center of gravity can be a weak seed for concave shapes.
 2. Neighboring points in an IEPS list are not always neighboring points on the real contour.
 
-The improved IEPS extension handles that by using an interior distance-transform seed and denser scan-line coverage. On the current generated results, it improves U-shape performance while preserving circle performance.
+The improved IEPS extension handles that by using an interior distance-transform seed and denser scan-line coverage. On the current generated results, it gives a smaller but still visible U-shape gain while preserving circle performance.
 
 The band-limited graph SCF is more robust than the local greedy idea in some noisy cases, but it is much slower. I would present it as an extension, not as the default method.
 
@@ -304,7 +304,7 @@ My strongest finding is that the algorithm is not difficult because of Sobel its
 ## Limitations
 
 - The implementation assumes one dominant object with strong object/background contrast; multiple objects are not handled.
-- The concave U-shape already breaks the paper's implicit assumptions (interior center of gravity, angular point order), which is why its F1 stays well below the circle cases.
+- The concave U-shape is sensitive to the paper's implicit assumptions (interior center of gravity, point ordering, and scan-line coverage). With the corrected author-style silhouette it performs well, but the parameter study still shows that these choices affect the contour.
 - The Yuen/Snake/Chen comparison baselines are compact approximations built from the paper's descriptions, not the cited methods' source code. In the current runs they do not reproduce every direction the paper reports (details in `docs/RESEARCH_REPORT.md`), so they are context, not evidence about the original methods.
 - Real-vase metrics use an Otsu-estimated proxy mask unless `data/vase_mask.png` is provided, so they are qualitative support rather than true ground-truth measurements.
 - Synthetic noise uses fixed seeds and an image-variance SNR definition; the paper's exact noise generator is unknown, so noisy results are comparable within this project but not pixel-identical to the paper.

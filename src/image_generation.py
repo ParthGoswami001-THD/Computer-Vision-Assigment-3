@@ -64,7 +64,13 @@ def create_u_shape_image(
     background: int = 0,
     foreground: int = 255,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """@brief Create a synthetic concave U-shape image and ground truth.
+    """@brief Create a paper-style synthetic concave U-shape image.
+
+    The ICARCV paper's U-shape is not a perfect rectangular block. It has
+    slanted shoulders near the top, a narrow central notch, mostly vertical
+    sides, and a rounded lower boundary. The polygon below keeps the image
+    synthetic and controlled while matching that silhouette more closely than a
+    simple three-rectangle U.
 
     @param size Image size as (height, width).
     @param background Background grayscale intensity.
@@ -74,14 +80,40 @@ def create_u_shape_image(
     height, width = size
     image = np.full((height, width), background, dtype=np.uint8)
     mask = np.zeros((height, width), dtype=np.uint8)
-    left = int(width * 0.28)
-    right = int(width * 0.72)
-    top = int(height * 0.22)
-    bottom = int(height * 0.78)
-    thickness = int(width * 0.12)
-    cv2.rectangle(mask, (left, top), (left + thickness, bottom), 255, -1)
-    cv2.rectangle(mask, (right - thickness, top), (right, bottom), 255, -1)
-    cv2.rectangle(mask, (left, bottom - thickness), (right, bottom), 255, -1)
+
+    outer_left = width * 0.30
+    outer_right = width * 0.70
+    side_top = height * 0.31
+    side_bottom = height * 0.70
+
+    bottom_center = (width * 0.50, height * 0.70)
+    bottom_rx = width * 0.20
+    bottom_ry = height * 0.095
+    bottom_curve = [
+        (
+            int(round(bottom_center[0] + bottom_rx * math.cos(angle))),
+            int(round(bottom_center[1] + bottom_ry * math.sin(angle))),
+        )
+        for angle in np.linspace(0.0, math.pi, 18)
+    ]
+
+    points = [
+        (int(round(outer_left)), int(round(side_top))),
+        (int(round(width * 0.36)), int(round(height * 0.25))),
+        (int(round(width * 0.43)), int(round(height * 0.25))),
+        (int(round(width * 0.47)), int(round(height * 0.36))),
+        (int(round(width * 0.46)), int(round(height * 0.44))),
+        (int(round(width * 0.54)), int(round(height * 0.44))),
+        (int(round(width * 0.53)), int(round(height * 0.36))),
+        (int(round(width * 0.57)), int(round(height * 0.25))),
+        (int(round(width * 0.64)), int(round(height * 0.25))),
+        (int(round(outer_right)), int(round(side_top))),
+        (int(round(outer_right)), int(round(side_bottom))),
+        *bottom_curve,
+        (int(round(outer_left)), int(round(side_bottom))),
+    ]
+    cv2.fillPoly(mask, [np.array(points, dtype=np.int32).reshape(-1, 1, 2)], 255)
+
     image[mask > 0] = foreground
     return image, mask, _contour_from_mask(mask)
 

@@ -1,5 +1,5 @@
 case,scf_method,ieps_ms,scf_ms,total_ms,canny_ms
-circle_clean,greedy,7.2644,3.3481,10.6125,5.5174
-circle_noisy,greedy,6.0335,2.0789,8.1124,4.3265
-u_shape_clean,greedy,6.5958,2.6455,9.2413,1.1698
-u_shape_noisy,greedy,6.0416,3.2726,9.3142,3.1992
+circle_clean,greedy,5.8881,1.6872,7.5753,10.2085
+circle_noisy,greedy,5.3602,1.6216,6.9818,3.8405
+u_shape_clean,greedy,5.8506,2.6117,8.4623,0.8269
+u_shape_noisy,greedy,4.9255,2.0533,6.9788,2.7611

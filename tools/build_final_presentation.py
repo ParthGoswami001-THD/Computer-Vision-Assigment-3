@@ -534,16 +534,37 @@ def build_slides() -> None:
     add_card(s, 716, 384, 500, 116, "Sensitivity finding",
              "Threshold 40/64/90 and stop tolerance 1-3 px shift F1 by < 0.3 pts - robust. Iteration count dominates: "
              "2 instead of 3 iterations drops F1 by ~13 pts. Point count and placement matter more than tuning.", ACCENT2, body_size=12)
-    add_card(s, 716, 512, 500, 124, "Real vase + honesty notes",
-             f"Real vase (Otsu proxy mask): paper-mode F1 {pct(vase_paper['f1'])}. Yuen/Snake/Chen comparisons "
-             "are labeled approximations; on these synthetic shapes they tie or nearly tie (Chen = proposed SCF "
-             "at every SNR), so they are context, not evidence of the paper's reported gaps.", AMBER, body_size=12)
+    add_card(s, 716, 512, 500, 124, "Honesty notes",
+             "Yuen/Snake/Chen comparisons are labeled approximations; on these synthetic shapes they tie or "
+             "nearly tie (Chen = proposed SCF at every SNR), so they are context, not evidence of the paper's "
+             "reported gaps. The real-image test follows on the next slide.", AMBER, body_size=12)
     add_text(s, f"Extensions stay inside the authors' method: graph-search SCF {pct(u_graph['f1'])} "
                 f"({ms(u_graph['total_ms'])}) and interior-seed improved IEPS {pct(u_improved['improved_f1'])} on the noisy U-shape.",
              64, 644, 1152, 30, size=13, color=MUTED)
     slides.append(s)
 
-    # 10 -- Conclusion + references ------------------------------------------
+    # 10 -- Results on the real vase ------------------------------------------
+    s = Slide("Real vase")
+    add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
+    add_header(s, "Results - real image", "Real vase: the paper's qualitative test",
+               "data/vase.png with an Otsu-estimated proxy mask - metrics are qualitative support, not ground-truth evaluation.")
+    add_image(s, ROOT / "results" / "real_vase_paper" / "panel.png", 64, 168, 1152, 268,
+              caption="Paper-mode pipeline on the real vase: input, Sobel gradient, center of gravity, 32 IEPS points, SCF contour, proxy ground truth")
+    vase_graph = get_rows(vase_rows, case="real_vase_paper", scf_method="graph")[0]
+    vase_improved = get_rows(vase_rows, case="real_vase_improved")[0]
+    add_table(s, 64, 486, 690, 136,
+              ["Configuration", "IEPS acc", "F1 (proxy)", "IEPS+SCF time"],
+              [["paper IEPS + greedy SCF", pct(vase_paper["ieps_accuracy"]), pct(vase_paper["f1"]), ms(vase_paper["total_ms"])],
+               ["paper IEPS + graph SCF (ext.)", pct(vase_graph["ieps_accuracy"]), pct(vase_graph["f1"]), ms(vase_graph["total_ms"])],
+               ["improved IEPS + greedy SCF (ext.)", pct(vase_improved["ieps_accuracy"]), pct(vase_improved["f1"]), ms(vase_improved["total_ms"])]],
+              [0.40, 0.18, 0.18, 0.24], 12)
+    add_card(s, 790, 486, 426, 136, "Reading",
+             "31/32 IEPS points sit on the vase edge; greedy SCF closes the contour in ~15 ms - consistent with "
+             "the paper's low-complexity claim (Table V: 37 ms vs 363 ms for Snake). The improved-IEPS extension "
+             "does not transfer here (F1 25%) - reported, not hidden.", AMBER, body_size=12)
+    slides.append(s)
+
+    # 11 -- Conclusion + references ------------------------------------------
     s = Slide("Conclusion")
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
     add_header(s, "Conclusion", "The method reproduces - once the missing rules are written down",

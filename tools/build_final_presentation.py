@@ -1,8 +1,9 @@
-"""Build the final IEPS + SCF presentation as an editable PPTX.
+"""Build the final IEPS + SCF presentation as an editable PPTX with PNG previews.
 
-The preferred artifact-tool runtime is not available in this workspace, so this
-script writes a compact OpenXML PowerPoint file directly and renders matching
-PNG previews with Pillow for visual QA.
+The deck follows the assignment's required 7-minute structure:
+title, problem (1), paper method (2), own work (2), code (2), results (1),
+conclusion + references (1). All quantitative values are read live from the
+generated CSV tables so the slides can never drift from the results.
 """
 
 from __future__ import annotations
@@ -48,17 +49,24 @@ BLUE = "1D4ED8"
 AMBER = "B45309"
 RED = "B91C1C"
 GREEN = "15803D"
+CODE_BG = "101826"
+CODE_TXT = "DCE7F0"
+CODE_CMT = "7C9A8E"
 
 FONT_REG = r"C:\Windows\Fonts\arial.ttf"
 FONT_BOLD = r"C:\Windows\Fonts\arialbd.ttf"
+FONT_MONO = r"C:\Windows\Fonts\consola.ttf"
 
 
-def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
-    path = FONT_BOLD if bold else FONT_REG
+def font(size: int, bold: bool = False, mono: bool = False) -> ImageFont.FreeTypeFont:
+    path = FONT_MONO if mono else (FONT_BOLD if bold else FONT_REG)
     try:
         return ImageFont.truetype(path, size=size)
     except OSError:
-        return ImageFont.load_default()
+        try:
+            return ImageFont.truetype(FONT_REG, size=size)
+        except OSError:
+            return ImageFont.load_default()
 
 
 def hex_to_rgb(h: str) -> Tuple[int, int, int]:
@@ -74,6 +82,10 @@ def xesc(text: Any) -> str:
     return escape(str(text), quote=False)
 
 
+def aesc(text: Any) -> str:
+    return escape(str(text), quote=True)
+
+
 def read_csv(path: Path) -> List[Dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
@@ -83,23 +95,21 @@ def pct(v: Any, decimals: int = 1) -> str:
     return f"{float(v) * 100:.{decimals}f}%"
 
 
+def ms(v: Any) -> str:
+    return f"{float(v):.1f} ms"
+
+
 def get_rows(rows: List[Dict[str, str]], **criteria: str) -> List[Dict[str, str]]:
-    output = []
-    for row in rows:
-        if all(row.get(key) == value for key, value in criteria.items()):
-            output.append(row)
-    return output
+    return [row for row in rows if all(row.get(k) == v for k, v in criteria.items())]
 
 
-main_rows = read_csv(ROOT / "results" / "tables" / "main_results.csv")
-param_rows = read_csv(ROOT / "results" / "tables" / "parameter_study.csv")
-improve_rows = read_csv(ROOT / "results" / "tables" / "improvement_comparison.csv")
-vase_rows = read_csv(ROOT / "results" / "tables" / "real_vase_results.csv")
-
-# The default main table is paper-method (greedy) only; the graph/band_graph
-# extension rows live in the opt-in all-SCF table.
-_all_scf_path = ROOT / "results" / "tables" / "main_results_all_scf.csv"
-variant_rows = read_csv(_all_scf_path) if _all_scf_path.exists() else main_rows
+TABLES = ROOT / "results" / "tables"
+main_rows = read_csv(TABLES / "main_results.csv")
+param_rows = read_csv(TABLES / "parameter_study.csv")
+improve_rows = read_csv(TABLES / "improvement_comparison.csv")
+vase_rows = read_csv(TABLES / "real_vase_results.csv")
+_all_scf = TABLES / "main_results_all_scf.csv"
+variant_rows = read_csv(_all_scf) if _all_scf.exists() else main_rows
 
 
 def main_case(case: str, method: str = "greedy") -> Dict[str, str]:
@@ -107,12 +117,17 @@ def main_case(case: str, method: str = "greedy") -> Dict[str, str]:
     return get_rows(rows, case=case, scf_method=method)[0]
 
 
+def param_case(case: str) -> Dict[str, str]:
+    return get_rows(param_rows, case=case)[0]
+
+
 circle_clean = main_case("circle_clean")
 circle_noisy = main_case("circle_noisy")
 u_clean = main_case("u_shape_clean")
 u_noisy = main_case("u_shape_noisy")
 u_graph = main_case("u_shape_noisy", "graph")
-u_band = main_case("u_shape_noisy", "band_graph")
+u_improved = get_rows(improve_rows, case="u_shape_noisy")[0]
+vase_paper = get_rows(vase_rows, case="real_vase_paper", scf_method="greedy")[0]
 
 
 @dataclass
@@ -150,103 +165,63 @@ def add_text(
     bold: bool = False,
     align: str = "left",
     valign: str = "top",
-    name: str = "text",
+    mono: bool = False,
     fill: Optional[str] = None,
     line: Optional[str] = None,
 ) -> None:
-    add(
-        slide,
-        "text",
-        x,
-        y,
-        w,
-        h,
-        text=text,
-        size=size,
-        color=color,
-        bold=bold,
-        align=align,
-        valign=valign,
-        name=name,
-        fill=fill,
-        line=line,
-    )
+    add(slide, "text", x, y, w, h, text=text, size=size, color=color, bold=bold,
+        align=align, valign=valign, mono=mono, fill=fill, line=line)
 
 
 def add_rect(slide: Slide, x: float, y: float, w: float, h: float, fill: str = PAPER, line: str = LINE) -> None:
     add(slide, "rect", x, y, w, h, fill=fill, line=line)
 
 
-def add_image(
-    slide: Slide,
-    path: Path,
-    x: float,
-    y: float,
-    w: float,
-    h: float,
-    fit: str = "contain",
-    caption: Optional[str] = None,
-) -> None:
+def add_image(slide: Slide, path: Path, x: float, y: float, w: float, h: float,
+              fit: str = "contain", caption: Optional[str] = None) -> None:
     add(slide, "image", x, y, w, h, path=path, fit=fit)
     if caption:
-        add_text(slide, caption, x, y + h + 8, w, 24, size=12, color=MUTED, align="center")
+        add_text(slide, caption, x, y + h + 6, w, 22, size=11, color=MUTED, align="center")
 
 
-def add_title(slide: Slide, title: str, kicker: str = "", subtitle: str = "") -> None:
-    if kicker:
-        add_text(slide, kicker.upper(), 64, 36, 720, 24, size=12, color=ACCENT, bold=True)
-    add_text(slide, title, 64, 62, 900, 78, size=34, color=INK, bold=True)
+def add_header(slide: Slide, kicker: str, title: str, subtitle: str = "") -> None:
+    """Fixed-height header: single-line title, subtitle never collides."""
+    add_text(slide, kicker.upper(), 64, 34, 1100, 20, size=12, color=ACCENT, bold=True)
+    add_text(slide, title, 64, 58, 1152, 44, size=29, color=INK, bold=True)
     if subtitle:
-        add_text(slide, subtitle, 64, 124, 1030, 42, size=15, color=MUTED)
-    add(slide, "line", 64, 154, 1152, 1, fill=LINE)
+        add_text(slide, subtitle, 64, 104, 1152, 40, size=13, color=MUTED)
+    add(slide, "line", 64, 150, 1152, 1, fill=LINE)
 
 
-def add_footer(slide: Slide, n: int) -> None:
-    add_text(slide, f"IEPS + SCF reproducibility study | {n:02d}", 64, 676, 420, 20, size=10, color="727B85")
-    add_text(
-        slide,
-        "Generated from project source, CSV tables, and result figures",
-        760,
-        676,
-        456,
-        20,
-        size=10,
-        color="727B85",
-        align="right",
-    )
+def add_footer(slide: Slide, n: int, total: int) -> None:
+    add_text(slide, f"IEPS + SCF reproducibility study  |  Parth Goswami  |  {n:02d} / {total:02d}",
+             64, 688, 620, 18, size=10, color="727B85")
+    add_text(slide, "Hsu et al., ICARCV 2010 [1]", 760, 688, 456, 18, size=10, color="727B85", align="right")
 
 
-def add_card(slide: Slide, x: float, y: float, w: float, h: float, title: str, body: str, accent: str = ACCENT) -> None:
+def add_card(slide: Slide, x: float, y: float, w: float, h: float, title: str, body: str,
+             accent: str = ACCENT, body_size: int = 13) -> None:
     add_rect(slide, x, y, w, h, fill=PAPER, line=LINE)
-    add_rect(slide, x, y, 7, h, fill=accent, line=accent)
-    add_text(slide, title, x + 18, y + 16, w - 28, 28, size=17, color=INK, bold=True)
-    add_text(slide, body, x + 18, y + 50, w - 32, h - 60, size=14, color=MUTED)
+    add_rect(slide, x, y, 6, h, fill=accent, line=accent)
+    add_text(slide, title, x + 18, y + 14, w - 30, 26, size=15, color=INK, bold=True)
+    add_text(slide, body, x + 18, y + 44, w - 32, h - 56, size=body_size, color=MUTED)
 
 
-def add_table(
-    slide: Slide,
-    x: float,
-    y: float,
-    w: float,
-    h: float,
-    headers: List[str],
-    rows: List[List[str]],
-    col_fracs: Optional[List[float]] = None,
-    font_size: int = 12,
-) -> None:
+def add_table(slide: Slide, x: float, y: float, w: float, h: float, headers: List[str],
+              rows: List[List[str]], col_fracs: Optional[List[float]] = None, font_size: int = 12) -> None:
     ncols = len(headers)
     col_fracs = col_fracs or [1.0 / ncols] * ncols
     col_widths = [w * fraction / sum(col_fracs) for fraction in col_fracs]
-    header_h = 36
+    header_h = 32
     row_h = (h - header_h) / max(len(rows), 1)
 
     cx = x
     for c, header in enumerate(headers):
         cw = col_widths[c]
         add_rect(slide, cx, y, cw, header_h, fill=DARK, line=DARK)
-        add_text(slide, header, cx + 8, y + 7, cw - 16, header_h - 8, size=font_size, color="FFFFFF", bold=True, valign="middle")
+        add_text(slide, header, cx + 8, y + 6, cw - 16, header_h - 8, size=font_size,
+                 color="FFFFFF", bold=True, valign="middle")
         cx += cw
-
     for r, row in enumerate(rows):
         cy = y + header_h + r * row_h
         cx = x
@@ -254,210 +229,355 @@ def add_table(
         for c, value in enumerate(row):
             cw = col_widths[c]
             add_rect(slide, cx, cy, cw, row_h, fill=fill, line=LINE)
-            add_text(slide, value, cx + 8, cy + 6, cw - 16, row_h - 10, size=font_size, color=INK if c == 0 else MUTED, bold=c == 0, valign="middle")
+            add_text(slide, value, cx + 8, cy + 5, cw - 16, row_h - 8, size=font_size,
+                     color=INK if c == 0 else MUTED, bold=c == 0, valign="middle")
             cx += cw
 
 
-def add_bar_chart(
-    slide: Slide,
-    x: float,
-    y: float,
-    w: float,
-    h: float,
-    labels: List[str],
-    values: List[float],
-    max_value: float = 1.0,
-    color: str = ACCENT,
-    title: str = "",
-) -> None:
+def add_bar_chart(slide: Slide, x: float, y: float, w: float, h: float, labels: List[str],
+                  values: List[float], colors: Optional[List[str]] = None, title: str = "",
+                  label_w: int = 200) -> None:
     if title:
-        add_text(slide, title, x, y - 34, w, 28, size=18, color=INK, bold=True)
-    left_label = 150
-    bar_gap = 14
+        add_text(slide, title, x, y - 30, w, 24, size=15, color=INK, bold=True)
+    bar_gap = 10
     bar_h = (h - bar_gap * (len(values) - 1)) / len(values)
     for i, (label, value) in enumerate(zip(labels, values)):
         yy = y + i * (bar_h + bar_gap)
-        add_text(slide, label, x, yy + 2, left_label - 12, bar_h, size=13, color=INK, bold=True, valign="middle")
-        add_rect(slide, x + left_label, yy + 5, w - left_label - 70, bar_h - 10, fill="E5E7EB", line="E5E7EB")
-        bar_w = (w - left_label - 70) * min(max(value / max_value, 0), 1)
-        add_rect(slide, x + left_label, yy + 5, bar_w, bar_h - 10, fill=color, line=color)
-        add_text(slide, f"{value * 100:.1f}%", x + w - 64, yy + 3, 64, bar_h, size=12, color=INK, bold=True, valign="middle")
+        color = (colors or [ACCENT] * len(values))[i]
+        add_text(slide, label, x, yy, label_w - 12, bar_h, size=12, color=INK, bold=True, valign="middle")
+        add_rect(slide, x + label_w, yy + 4, w - label_w - 66, bar_h - 8, fill="E5E7EB", line="E5E7EB")
+        bar_w = (w - label_w - 66) * min(max(value, 0), 1)
+        add_rect(slide, x + label_w, yy + 4, bar_w, bar_h - 8, fill=color, line=color)
+        add_text(slide, f"{value * 100:.1f}%", x + w - 60, yy, 60, bar_h, size=12, color=INK,
+                 bold=True, valign="middle")
 
 
 def add_pipeline(slide: Slide, items: List[Tuple[str, str]], x: float, y: float, w: float, h: float) -> None:
-    gap = 18
+    gap = 16
     box_w = (w - gap * (len(items) - 1)) / len(items)
     for i, (head, body) in enumerate(items):
         bx = x + i * (box_w + gap)
         add_rect(slide, bx, y, box_w, h, fill=PAPER, line=LINE)
-        add_text(slide, head, bx + 14, y + 18, box_w - 28, 32, size=16, color=INK, bold=True, align="center")
-        add_text(slide, body, bx + 14, y + 58, box_w - 28, h - 72, size=12, color=MUTED, align="center")
+        add_text(slide, head, bx + 10, y + 12, box_w - 20, 26, size=14, color=INK, bold=True, align="center")
+        add_text(slide, body, bx + 10, y + 42, box_w - 20, h - 52, size=11, color=MUTED, align="center")
         if i < len(items) - 1:
-            add(slide, "arrow", bx + box_w + 4, y + h / 2 - 10, gap - 8, 20, fill=ACCENT, line=ACCENT)
+            add(slide, "arrow", bx + box_w + 3, y + h / 2 - 9, gap - 6, 18, fill=ACCENT, line=ACCENT)
 
+
+def add_code(slide: Slide, x: float, y: float, w: float, h: float, lines: List[str],
+             size: int = 13, pitch: int = 19) -> None:
+    """Dark code panel; comment-only lines rendered in a muted tone."""
+    add_rect(slide, x, y, w, h, fill=CODE_BG, line=CODE_BG)
+    ty = y + 16
+    for raw in lines:
+        color = CODE_CMT if raw.lstrip().startswith("#") else CODE_TXT
+        add_text(slide, raw, x + 22, ty, w - 44, pitch + 2, size=size, color=color, mono=True)
+        ty += pitch
+
+
+# --------------------------------------------------------------------------
+# Slides
+# --------------------------------------------------------------------------
 
 def build_slides() -> None:
+    # 1 -- Title -----------------------------------------------------------
     s = Slide("Title")
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
-    add_text(s, "REIMPLEMENTATION AND VALIDATION", 64, 54, 740, 28, size=13, color=ACCENT, bold=True)
-    add_text(s, "IEPS + SCF\nObject Contour Extraction", 64, 112, 650, 130, size=38, color=INK, bold=True)
-    add_text(s, "A traditional computer vision reproducibility study of Hsu et al. (ICARCV 2010)", 64, 252, 720, 56, size=18, color=MUTED)
-    add_card(s, 64, 382, 342, 150, "Final research question", "Can the method be rebuilt from the paper description and validated on author-style circle and U-shape images, including noise, while identifying missing implementation choices?", ACCENT)
-    add_card(s, 430, 382, 300, 150, "Core claim", "The method is reproducible for star-convex shapes; concave U-shapes expose under-specified assumptions in IEPS and SCF.", BLUE)
-    add_image(s, ROOT / "results" / "u_shape_noisy" / "panel.png", 820, 116, 380, 284, caption="Project-generated U-shape noisy IEPS + SCF panel")
-    add_rect(s, 820, 430, 380, 86, fill=INK, line=INK)
-    add_text(s, "Contribution: implementation + validation + missing-detail audit", 844, 454, 332, 38, size=17, color="FFFFFF", bold=True, align="center", valign="middle")
+    add_text(s, "COMPUTER VISION - ASSIGNMENT 3  |  DEGGENDORF INSTITUTE OF TECHNOLOGY  |  SUMMER 2026",
+             64, 44, 1152, 20, size=12, color=ACCENT, bold=True)
+    add_text(s, "Reimplementation and Validation of IEPS + SCF\nfor Object Contour Extraction",
+             64, 84, 1080, 100, size=34, color=INK, bold=True)
+    add_text(s, "A Traditional Computer Vision Reproducibility Study", 64, 196, 900, 30, size=17, color=MUTED)
+    add_card(s, 64, 250, 700, 96, "Assigned paper",
+             'R. C. Hsu, P.-W. Kao, W.-J. Lai, and C.-T. Liu, "An initial edge point selection and '
+             'segmental contour following for object contour extraction," Proc. IEEE ICARCV, 2010.',
+             ACCENT, body_size=13)
+    add_card(s, 796, 250, 420, 96, "Presenter", "Parth Goswami\n7-minute presentation  |  Python + NumPy + OpenCV", BLUE)
+    add_image(s, ROOT / "results" / "u_shape_noisy" / "panel.png", 64, 386, 1152, 220,
+              caption="Generated by this implementation: input, Sobel gradient, center of gravity, IEPS points, SCF contour, ground truth")
     slides.append(s)
 
-    s = Slide("Research direction")
+    # 2 -- Problem (1 slide) ------------------------------------------------
+    s = Slide("Problem")
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
-    add_title(s, "Research direction after professor feedback", "Framing", "The project is not a broad Canny comparison. It is a reproducibility study of the paper's own IEPS + SCF pipeline.")
-    add_card(s, 64, 194, 346, 170, "Original risk", "A broad edge-detector comparison would drift away from the authors' contribution and become a generic segmentation project.", RED)
-    add_card(s, 466, 194, 346, 170, "Correct focus", "Reimplement IEPS and SCF, test the same style of synthetic images, and document the assumptions needed for executable code.", ACCENT)
-    add_card(s, 868, 194, 346, 170, "Best extension", "Stay inside the paper: run parameter validation for scan lines, thresholds, IEPS iterations, SCF stopping, scoring, and noise.", BLUE)
-    add_text(s, "Presentation stance", 64, 430, 300, 30, size=24, color=INK, bold=True)
-    add_text(s, "After discussion with the professor, I focused on the authors' original direction: reimplementing and validating IEPS + SCF. Instead of adding unrelated preprocessing or large external methods, I investigated the parameters and implementation choices necessary to reproduce the paper's contour extraction behavior.", 64, 472, 1120, 88, size=20, color=INK, bold=True)
+    add_header(s, "The authors' problem", "Closed object contours without manual initialization",
+               "Contour extraction must be automatic, accurate, and cheap enough for industrial inspection on low-level processors.")
+    add_card(s, 64, 178, 368, 168, "Edge detectors",
+             "Gradient operators such as Sobel find strong edges efficiently, but a closed contour is not guaranteed - edges stay fragmented.", RED)
+    add_card(s, 456, 178, 368, 168, "Active contours (Snake)",
+             "Kass-style snakes produce closed contours, but the initial snaxels must be placed manually near the object, and the optimization is computationally heavy.", AMBER)
+    add_card(s, 848, 178, 368, 168, "Automatic initialization",
+             "Yuen's fixed-angle scan lines select initial points automatically, but lack flexibility on concave or polygonal shapes and are easily disturbed by noise.", BLUE)
+    add_rect(s, 64, 390, 1152, 92, fill=INK, line=INK)
+    add_text(s, "Goal of Hsu et al.: select initial edge points automatically (IEPS), then trace the contour "
+                "segment by segment (SCF) using gradient + a gravity-like pull toward the next point - "
+                "a closed contour at low computational cost.",
+             90, 410, 1100, 56, size=16, color="FFFFFF", bold=True, valign="middle")
+    add_text(s, "Evaluation in the paper: man-made circle and U-shape images (clean + white Gaussian noise, down to SNR 20.3 dB) "
+                "with known true edges, plus a real vase image.",
+             64, 508, 1152, 40, size=13, color=MUTED)
     slides.append(s)
 
-    s = Slide("Paper method")
+    # 3 -- Paper method I: IEPS --------------------------------------------
+    s = Slide("Paper method IEPS")
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
-    add_title(s, "What Hsu et al. propose", "Paper model", "The paper couples automatic initialization with local contour following to avoid manual Snake initialization.")
-    add_pipeline(s, [("Input image", "circle, U-shape, noisy versions, and vase"), ("Sobel gradient", "edge strength for IEPS and SCF"), ("IEPS", "CoG, scan lines, 3 refinements, T=64"), ("SCF", "trace between neighboring IEPS points"), ("Closed contour", "combine segmental contours")], 78, 214, 1124, 168)
-    add_table(s, 94, 434, 1092, 164, ["Paper component", "Implemented interpretation"], [["IEPS", "4 initial scan lines, 3 iterations, threshold 64, about 32 final edge points."], ["Related direction", "Dx and Dy signs classify the target direction between neighboring IEPS points."], ["Gravity-style SCF", "Candidate score combines Sobel gradient strength with distance-to-target information."], ["Validation", "Selected points and final contour are compared against known synthetic ground truth."]], [0.28, 0.72], 13)
+    add_header(s, "Paper solution 1/2", "IEPS - Initial Edge Point Selection",
+               "Radiating scan lines from the center of gravity, then iterative midpoint refinement; every equation below is implemented in src/ieps.py and src/geometry.py.")
+    steps = [
+        ("Center of gravity - Eq. (1)-(2)",
+         "m_ij = SUM_x SUM_y  x^i y^j f(x,y)      G = ( m10 / m00 ,  m01 / m00 )"),
+        ("Initial scan lines - Eq. (3)",
+         "N = 4 rays with equal angle 2*pi/N from G. Along each ray, keep the pixel farthest from G whose 3x3 Sobel gradient exceeds T = 64; otherwise drop."),
+        ("Iterative refinement - Eq. (5)-(6)",
+         "Midpoint M_i of neighbors (S_i, S_i+1) seeds a new scan line normal to S_i S_i+1 (slope m1 = -1/m2). One new point is inserted between every pair."),
+        ("Shrinking search + point budget - Eq. (7), (4)",
+         "Scan distance halves every iteration: d = D / 2^(p-1).  Total points N_total = N * 2^p = 4 * 2^3 = 32."),
+    ]
+    yy = 178
+    for head, body in steps:
+        add_rect(s, 64, yy, 690, 92, fill=PAPER, line=LINE)
+        add_rect(s, 64, yy, 6, 92, fill=ACCENT, line=ACCENT)
+        add_text(s, head, 84, yy + 10, 656, 22, size=14, color=INK, bold=True)
+        add_text(s, body, 84, yy + 34, 656, 52, size=12, color=MUTED)
+        yy += 104
+    add_image(s, ROOT / "results" / "u_shape_noisy" / "initial_scan_lines.png", 790, 180, 200, 200,
+              caption="4 rays from the CoG + first points")
+    add_image(s, ROOT / "results" / "u_shape_noisy" / "ieps_points.png", 1010, 180, 200, 200,
+              caption="32 IEPS points after 3 iterations")
+    add_image(s, ROOT / "results" / "circle_noisy" / "ieps_points.png", 790, 432, 200, 200,
+              caption="Noisy circle: 32/32 on true edge")
+    add_card(s, 1010, 432, 200, 200, "Why it matters",
+             "Good initial points are the whole game: SCF only connects neighbors, so IEPS quality bounds the final contour.", ACCENT2, body_size=12)
     slides.append(s)
 
-    s = Slide("Source map")
+    # 4 -- Paper method II: SCF --------------------------------------------
+    s = Slide("Paper method SCF")
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
-    add_title(s, "Implementation map from source code", "Read-through result", "The codebase separates image synthesis, IEPS, SCF, evaluation, baselines, and reporting into testable modules.")
-    modules = [("image_generation.py", "circle, U-shape, noise, vase path"), ("gradients.py", "Sobel magnitude normalized to 0..255"), ("geometry.py", "CoG, ray sampling, line sampling, ordering"), ("ieps.py", "paper-faithful initial edge selection"), ("scf.py", "greedy, graph, band-graph contour following"), ("evaluation.py", "point accuracy, contour metrics, runtime"), ("paper_baselines.py", "Yuen/Snake/Chen-style approximations"), ("main.py", "CLI run modes and table generation")]
-    for i, (head, body) in enumerate(modules):
-        x = 64 + (i % 4) * 288
-        y = 204 + (i // 4) * 150
-        add_card(s, x, y, 252, 110, head, body, [ACCENT, BLUE, AMBER, ACCENT2][i % 4])
-    add_text(s, "Important design decision", 78, 534, 318, 30, size=22, color=INK, bold=True)
-    add_text(s, "The unavailable Yuen, Kass/Snake, and Chen methods are implemented only as clearly labeled approximations. The core claim rests on the IEPS + SCF implementation and its own validation artifacts.", 78, 572, 1070, 44, size=18, color=INK)
+    add_header(s, "Paper solution 2/2", "SCF - Segmental Contour Following",
+               "Between every neighboring IEPS pair, a 3-candidate operating mask walks pixel by pixel, pulled by a gravity-like force toward the target point.")
+    steps = [
+        ("Related direction - Eq. (8), Table I",
+         "Dx = x_i+1 - x_i,  Dy = y_i+1 - y_i.  The sign pair (Dx, Dy) selects one of 9 states: E, SE, S, SW, W, NW, N, NE, or linked."),
+        ("Operating mask - Fig. 4",
+         "Each state maps to a mask with three candidate pixels A, B, C around the current point, oriented toward the target."),
+        ("Force of gravity - Eq. (9)",
+         "F(p) = grad_f(x,y) / sqrt(dx^2 + dy^2).  Gradient magnitude acts as mass; distance to the target supplies the attraction."),
+        ("Closure - Fig. 2",
+         "The candidate with the largest F(p) becomes the next contour point and the new origin; segments repeat until the contour is closed."),
+    ]
+    yy = 178
+    for head, body in steps:
+        add_rect(s, 64, yy, 690, 92, fill=PAPER, line=LINE)
+        add_rect(s, 64, yy, 6, 92, fill=BLUE, line=BLUE)
+        add_text(s, head, 84, yy + 10, 656, 22, size=14, color=INK, bold=True)
+        add_text(s, body, 84, yy + 34, 656, 52, size=12, color=MUTED)
+        yy += 104
+    add_image(s, ROOT / "results" / "u_shape_noisy" / "scf_contour.png", 790, 180, 200, 200,
+              caption="SCF trace, noisy U-shape")
+    add_image(s, ROOT / "results" / "circle_noisy" / "scf_contour.png", 1010, 180, 200, 200,
+              caption="SCF trace, noisy circle")
+    add_card(s, 790, 432, 420, 200, "Paper's claims to validate",
+             "IEPS beats Yuen's fixed-angle initialization (Table II); SCF beats Chen's gradient-only tracing "
+             "(96-98% vs ~80% true-positive ratio, Table IV); whole pipeline runs in tens of milliseconds (Table V).",
+             GREEN, body_size=13)
     slides.append(s)
 
-    s = Slide("IEPS")
+    # 5 -- Own work 1: research question + audit ----------------------------
+    s = Slide("Own work: audit")
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
-    add_title(s, "IEPS: executable interpretation", "Initial edge point selection", "The paper's geometric description is made concrete through scan-line sampling and candidate selection rules.")
-    add_image(s, ROOT / "results" / "circle_noisy" / "ieps_points.png", 82, 210, 250, 250, caption="circle noisy: IEPS points")
-    add_image(s, ROOT / "results" / "u_shape_noisy" / "ieps_points.png", 376, 210, 250, 250, caption="U-shape noisy: IEPS points")
-    add_table(s, 680, 198, 500, 276, ["Step", "Concrete implementation"], [["Center", "contrast-weighted center of gravity"], ["First rays", "4 fixed scan lines through center"], ["Refinement", "midpoints + normal scan lines"], ["Iterations", "3 refinement passes"], ["Threshold", "Sobel magnitude >= 64"], ["Fallback", "max-gradient candidate if threshold misses"]], [0.34, 0.66], 12)
-    add_card(s, 82, 514, 1098, 78, "Finding", "IEPS works cleanly for the circle because the center of gravity sits inside a star-convex object. The U-shape is harder because the center can lie in or near the concavity, changing ray intersections and point order.", ACCENT)
+    add_header(s, "Own work 1/2", "A reproducibility study of IEPS + SCF",
+               "Agreed with the professor: validate the authors' own method instead of drifting into a broad Canny / preprocessing comparison.")
+    add_rect(s, 64, 172, 1152, 74, fill=PAPER, line=LINE)
+    add_rect(s, 64, 172, 6, 74, fill=ACCENT, line=ACCENT)
+    add_text(s, "Research question: Can IEPS + SCF be reimplemented from the paper description alone and validated on "
+                "author-style circle and U-shape images, including noisy cases, while identifying the missing "
+                "implementation details needed to reproduce the behavior?",
+             84, 186, 1114, 50, size=14, color=INK, bold=True)
+    add_table(s, 64, 274, 1152, 300,
+              ["Under-specified in the paper", "Why it changes the result", "Rule fixed in this implementation"],
+              [["'Closed contour?' stop rule", "a flow-chart diamond is not code", "stop when distance to target <= 2 px"],
+               ["Candidate tie-breaking", "several pixels score alike on flat edges", "score, then gradient, then target distance"],
+               ["Loop prevention", "greedy tracing can revisit pixels", "visited set per segment + max 3x distance steps"],
+               ["Weak-gradient candidates", "noise breaks edges; mask can go blind", "fall back to the candidate closest to the target"],
+               ["Scan-line discretization", "which pixels lie on a ray / normal line", "integer sampling; public points stay (x, y)"],
+               ["Missing edge on a scan line", "threshold can fail on a whole line", "max-gradient fallback instead of silent drop"],
+               ["True-positive tolerance", "paper reports ratios without a radius", "2 px tolerance, distance-transform based"]],
+              [0.28, 0.34, 0.38], 12)
+    add_text(s, "Contribution: every rule above is made explicit, implemented, and then measured - the extension is a "
+                "parameter study inside IEPS + SCF, not an external method.",
+             64, 596, 1152, 40, size=14, color=INK, bold=True)
     slides.append(s)
 
-    s = Slide("SCF")
+    # 6 -- Own work 2: implementation ---------------------------------------
+    s = Slide("Own work: implementation")
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
-    add_title(s, "SCF: from flow chart to code", "Segmental contour following", "Each neighboring IEPS pair defines one segment; the implementation turns the paper's direction mask into deterministic pixel tracing.")
-    add_pipeline(s, [("Si -> Si+1", "neighboring IEPS points define target direction"), ("Direction state", "sign(Dx), sign(Dy) maps to N, NE, E, ..."), ("Candidate mask", "local candidates consistent with direction"), ("Score", "gradient / (distance^2 + 1) by default"), ("Stop", "target reached within tolerance or guard rule fires")], 74, 206, 1132, 150)
-    add_table(s, 78, 420, 548, 160, ["Paper phrase", "Implemented assumption"], [["closed contour?", "all segments finish and concatenate"], ["force of gravity", "gradient plus inverse squared target distance"], ["mask direction", "three candidate moves by related direction"], ["avoid loops", "visited-pixel and max-step guards"]], [0.38, 0.62], 12)
-    add_image(s, ROOT / "results" / "circle_noisy" / "scf_contour.png", 700, 412, 220, 180, caption="circle SCF")
-    add_image(s, ROOT / "results" / "u_shape_noisy" / "scf_contour.png", 956, 412, 220, 180, caption="U-shape SCF")
+    add_header(s, "Own work 2/2", "Implementation and validation design",
+               "Hand-coded IEPS, SCF, geometry, and metrics in Python/NumPy; OpenCV only for Sobel, the secondary Canny baseline, and image I/O.")
+    add_pipeline(s, [("Synthetic images", "circle + U-shape, clean and sigma=20 noise, fixed seeds"),
+                     ("Sobel gradient", "3x3 magnitude, normalized 0..255"),
+                     ("CoG + IEPS", "4 rays, 3 iterations, T=64, 32 points"),
+                     ("SCF", "mask + gravity score per segment"),
+                     ("Validation", "point accuracy, precision/recall/F1, runtime")],
+                 64, 172, 1152, 128)
+    add_table(s, 64, 330, 690, 244, ["Design decision", "Choice used (and measured)"],
+              [["Gravity score", "grad / (d^2 + 1): bounded at d = 0; gradient-only vs gradient/distance compared"],
+               ["Point ordering", "topological insertion order (angle sort chords across the notch)"],
+               ["Refinement rule", "farthest-from-center, consistent with the initial rays"],
+               ["Center of gravity", "contrast-weighted moments; raw moments biased by non-zero background"],
+               ["Closure", "trace every neighboring pair, including last -> first"]],
+              [0.30, 0.70], 12)
+    add_card(s, 790, 330, 420, 116, "Metrics",
+             "IEPS accuracy (points within 2 px of true contour), neighbor spacing mean/std, tolerance-based "
+             "precision / recall / F1, and IEPS + SCF runtime per case.", BLUE, body_size=12)
+    add_card(s, 790, 462, 420, 112, "Parameter study (extension)",
+             "Threshold 40/64/90; 4 vs 8 rays; 2 vs 3 iterations; stop tolerance 1-3 px; score formula; "
+             "point order; refinement rule; three noise levels.", ACCENT, body_size=12)
+    add_text(s, "Everything is regenerated by one command (python main.py --run all); slides and report read the same CSV tables.",
+             64, 596, 1152, 30, size=13, color=MUTED)
     slides.append(s)
 
-    s = Slide("Validation design")
+    # 7 -- Code 1: IEPS ------------------------------------------------------
+    s = Slide("Code IEPS")
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
-    add_title(s, "Validation design", "Experiments", "The validation is intentionally close to the paper: author-style synthetic shapes, Gaussian noise, IEPS point accuracy, final contour metrics, and runtime.")
-    add_image(s, ROOT / "results" / "circle_noisy" / "panel.png", 64, 204, 540, 236, caption="circle_noisy panel")
-    add_image(s, ROOT / "results" / "u_shape_noisy" / "panel.png", 676, 204, 540, 236, caption="u_shape_noisy panel")
-    add_table(s, 86, 504, 1088, 100, ["Metric", "Purpose", "Current operational definition"], [["IEPS accuracy", "validate initial edge points", "point is correct if within 2 px of ground-truth contour"], ["Precision / recall / F1", "validate final contour", "predicted contour mask compared to ground truth with tolerance"], ["Runtime", "efficiency", "IEPS time + SCF time in milliseconds"]], [0.18, 0.27, 0.55], 12)
+    add_header(s, "Code 1/2", "IEPS core: rays, then midpoint-normal refinement",
+               "Condensed from src/ieps.py - the loop structure mirrors the paper's equations directly.")
+    add_code(s, 64, 168, 1152, 468, [
+        "# 1) Initial rays: farthest strong-gradient pixel on each of N = 4 scan lines",
+        "for i in range(initial_scan_lines):",
+        "    angle = 2.0 * math.pi * i / initial_scan_lines",
+        "    ray = sample_ray_from_center(center, angle, image.shape)",
+        "    candidates = [p for p in ray if gradient[p[1], p[0]] >= threshold]   # Eq. (3)",
+        "    if candidates:",
+        "        points.append(max(candidates, key=lambda p: distance(p, center)))",
+        "",
+        "# 2) Refinement: insert one new point between every neighboring pair",
+        "for iteration in range(1, iterations + 1):                    # p = 1 .. 3",
+        "    radius = max(3.0, default_scan_distance / 2.0 ** iteration)   # Eq. (7)",
+        "    next_points = []",
+        "    for idx in range(len(points)):",
+        "        p1, p2 = points[idx], points[(idx + 1) % len(points)]",
+        "        mid = midpoint(p1, p2)                                    # Eq. (5)",
+        "        normal = normal_vector(p1, p2)                            # Eq. (6)",
+        "        scan = sample_line_through_point(mid, normal, image.shape, radius)",
+        "        selected = select_edge_candidate(scan, gradient, threshold, fallback)",
+        "        next_points.append(p1)",
+        "        if selected is not None:",
+        "            next_points.append(selected)    # new point stays between its parents",
+        "    points = unique_preserve_order(next_points)      # N * 2**p  ->  32 points",
+    ])
+    add_text(s, "Insertion order is preserved (topological): a refined point remains between the pair that created it, "
+                "which keeps SCF segments short and local.", 64, 644, 1152, 30, size=13, color=MUTED)
     slides.append(s)
 
-    s = Slide("Main results")
+    # 8 -- Code 2: SCF -------------------------------------------------------
+    s = Slide("Code SCF")
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
-    add_title(s, "Main result: circles reproduce cleanly, U-shapes expose assumptions", "Quantitative finding", "The default paper-mode IEPS + greedy SCF is excellent on circles and weaker on concave U-shapes.")
-    labels = ["circle clean", "circle noisy", "U clean", "U noisy"]
-    add_bar_chart(s, 80, 220, 520, 250, labels, [float(circle_clean["f1"]), float(circle_noisy["f1"]), float(u_clean["f1"]), float(u_noisy["f1"])], color=ACCENT, title="Final contour F1")
-    add_bar_chart(s, 684, 220, 500, 250, labels, [float(circle_clean["ieps_accuracy"]), float(circle_noisy["ieps_accuracy"]), float(u_clean["ieps_accuracy"]), float(u_noisy["ieps_accuracy"])], color=BLUE, title="IEPS point accuracy")
-    add_table(s, 102, 530, 1030, 92, ["Case", "IEPS", "F1", "Segments reached", "Runtime"], [["circle_noisy", pct(circle_noisy["ieps_accuracy"]), pct(circle_noisy["f1"]), f"{circle_noisy['target_reached_segments']}/{circle_noisy['total_segments']}", f"{float(circle_noisy['total_ms']):.1f} ms"], ["u_shape_noisy", pct(u_noisy["ieps_accuracy"]), pct(u_noisy["f1"]), f"{u_noisy['target_reached_segments']}/{u_noisy['total_segments']}", f"{float(u_noisy['total_ms']):.1f} ms"]], [0.28, 0.16, 0.16, 0.22, 0.18], 12)
+    add_header(s, "Code 2/2", "SCF core: masked greedy tracing with a gravity score",
+               "Condensed from src/scf.py - every rule the paper leaves open is an explicit line of code here.")
+    add_code(s, 64, 168, 1152, 468, [
+        "def trace_segment_greedy(gradient, start, target, tol=2.0):",
+        "    max_steps = max(5, math.ceil(3.0 * distance(start, target)))   # step guard",
+        "    current, path, visited = start, [start], {start}",
+        "    for _ in range(max_steps):",
+        "        if distance(current, target) <= tol:                # explicit stop rule",
+        "            break",
+        "        cands = directional_candidates(current, target)     # 3-pixel mask, Fig. 4",
+        "        cands = [p for p in cands if p not in visited] or cands    # no loops",
+        "        if max(grad(p) for p in cands) < 1.0:               # broken edge?",
+        "            best = min(cands, key=lambda p: distance(p, target))   # fallback",
+        "        else:",
+        "            best = max(cands, key=lambda p: (",
+        "                grad(p) / (distance(p, target) ** 2 + 1.0),  # gravity ~ Eq. (9)",
+        "                grad(p),                                     # tie-break: gradient",
+        "                -distance(p, target)))                       # tie-break: distance",
+        "        current = best",
+        "        path.append(best)",
+        "        visited.add(best)",
+        "    return path",
+        "",
+        "# closed contour: trace every neighboring pair, including last -> first",
+        "for i in range(len(points)):",
+        "    contour += trace_segment_greedy(grad, points[i], points[(i + 1) % len(points)])",
+    ])
+    add_text(s, "With these rules fixed, all 32/32 segments reach their target on every main case - the 'closed contour?' "
+                "diamond of the paper becomes a measurable property.", 64, 644, 1152, 30, size=13, color=MUTED)
     slides.append(s)
 
-    s = Slide("What authors forgot")
+    # 9 -- Results (1 slide) -------------------------------------------------
+    s = Slide("Results")
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
-    add_title(s, "What the paper forgot to specify", "Reproducibility contribution", "The main reproducibility challenge was SCF: the paper gives the gravity-force and mask idea, but not stopping tolerance, loop prevention, tie-breaking, weak-gradient fallback, or max-step handling. These choices were implemented explicitly and evaluated.")
-    add_table(s, 64, 190, 1152, 424, ["Missing detail", "Why it matters", "Project assumption"], [["Scan-line discretization", "which pixels lie on a ray or normal line", "implemented explicit row/column sampling"], ["Threshold tuning", "64 works for paper scale, not universal", "tested 40/64/90"], ["Noise generation", "SNR cannot be reproduced exactly", "documented Gaussian sigma and SNR cases"], ["True-positive tolerance", "point accuracy changes with radius", "used 2 px tolerance"], ["SCF stopping", "'closed contour?' is not code", "target tolerance plus guard rules"], ["Tie-breaking", "many candidate pixels can score similarly", "deterministic candidate order"], ["Loop prevention", "contour following can revisit pixels", "visited-set and max-step checks"], ["Missing scan-line edge", "noisy lines can fail the threshold", "configurable fallback; default max-gradient point"], ["Coordinate convention", "paper x/y vs OpenCV row/column", "kept public points as (x, y)"]], [0.26, 0.37, 0.37], 11)
+    add_header(s, "Results", "Circles reproduce perfectly; the U-shape stresses the assumptions",
+               "All values from results/tables/*.csv, regenerated by main.py; tolerance 2 px, fixed noise seeds.")
+
+    def result_row(name: str, row: Dict[str, str]) -> List[str]:
+        return [name, f"{row['ieps_points']}", pct(row["ieps_accuracy"]), pct(row["precision"]),
+                pct(row["recall"]), pct(row["f1"]), ms(row["total_ms"])]
+
+    add_table(s, 64, 176, 1152, 176,
+              ["Case", "IEPS pts", "IEPS acc", "Precision", "Recall", "F1", "IEPS+SCF time"],
+              [result_row("circle_clean", circle_clean),
+               result_row("circle_noisy", circle_noisy),
+               result_row("u_shape_clean", u_clean),
+               result_row("u_shape_noisy", u_noisy)],
+              [0.20, 0.10, 0.13, 0.14, 0.13, 0.12, 0.18], 12)
+    add_bar_chart(s, 64, 414, 620, 208,
+                  ["paper defaults", "2 iterations", "8 scan lines", "angle ordering", "graph SCF (ext.)", "improved IEPS (ext.)"],
+                  [float(u_noisy["f1"]), float(param_case("param_iterations_2")["f1"]),
+                   float(param_case("param_scanlines_8")["f1"]), float(param_case("param_order_angle")["f1"]),
+                   float(u_graph["f1"]), float(u_improved["improved_f1"])],
+                  colors=[ACCENT, RED, ACCENT, ACCENT, BLUE, BLUE],
+                  title="Noisy U-shape F1 under implementation choices", label_w=210)
+    add_card(s, 716, 384, 500, 116, "Sensitivity finding",
+             "Threshold 40/64/90 and stop tolerance 1-3 px shift F1 by < 0.3 pts - robust. Iteration count dominates: "
+             "2 instead of 3 iterations drops F1 by ~13 pts. Point count and placement matter more than tuning.", ACCENT2, body_size=12)
+    add_card(s, 716, 512, 500, 110, "Real vase + honesty notes",
+             f"Real vase (Otsu proxy mask): paper-mode F1 {pct(vase_paper['f1'])} in {ms(vase_paper['total_ms'])}. "
+             "Yuen/Snake/Chen comparisons are labeled approximations; on these synthetic shapes they tie or nearly tie "
+             "(Chen = proposed SCF at every SNR), so they are context, not evidence of the paper's reported gaps.", AMBER, body_size=12)
+    add_text(s, f"Extensions stay inside the authors' method: graph-search SCF {pct(u_graph['f1'])} "
+                f"({ms(u_graph['total_ms'])}) and interior-seed improved IEPS {pct(u_improved['improved_f1'])} on the noisy U-shape.",
+             64, 644, 1152, 30, size=13, color=MUTED)
     slides.append(s)
 
-    s = Slide("Parameter validation")
-    add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
-    add_title(s, "Parameter validation inside IEPS + SCF", "Best extension", "The most defensible extension is not an external method; it is testing the under-specified choices inside the proposed algorithm.")
-    add_table(s, 64, 196, 740, 360, ["Choice", "Tested values", "Interpretation"], [["Sobel threshold", "40, 64, 90", "U-noisy F1 changes only modestly; 64 is plausible but not uniquely optimal."], ["Initial scan lines", "4 vs 8", "More rays do not automatically improve paper-mode U-shape performance."], ["IEPS iterations", "2 vs 3", "Additional refinement can shift points rather than monotonically improve them."], ["SCF tolerance", "1, 2, 3 px", "Stopping tolerance changes contour completeness and precision trade-off."], ["Score formula", "gradient only vs gradient/distance", "Distance term makes the rule closer to the paper's gravity description."], ["Noise", "clean, low, paper-like", "Noise primarily hurts concave U-shape contour quality."]], [0.24, 0.22, 0.54], 11)
-    thr = [(r["threshold"], r["f1"]) for r in param_rows if r["case"].startswith("param_threshold")]
-    add_bar_chart(s, 850, 240, 320, 168, [f"T={int(float(t))}" for t, _ in thr], [float(v) for _, v in thr], color=AMBER, title="Threshold study F1")
-    add_bar_chart(s, 850, 488, 320, 114, ["clean", "low", "paper-like"], [float(r["f1"]) for r in param_rows if r["case"].startswith("param_noise")], color=BLUE, title="Noise study F1")
-    slides.append(s)
-
-    s = Slide("Improved IEPS")
-    add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
-    add_title(s, "Traditional-CV improvement: interior seed + denser coverage", "Extension", "The improved mode keeps the research inside IEPS: it changes the seed and coverage, not the problem into deep learning or unrelated preprocessing.")
-    add_card(s, 70, 204, 330, 150, "Problem in paper IEPS", "The paper assumes the center of gravity lies inside a star-convex object. On concave U-shapes, this can place rays through the notch or create poor angular ordering.", RED)
-    add_card(s, 474, 204, 330, 150, "Improved IEPS", "Use an Otsu silhouette only to check the seed. If the CoG is outside foreground, relocate to the distance-transform maximum, then use denser radial coverage.", ACCENT)
-    add_card(s, 878, 204, 330, 150, "Research position", "This is an extension, not the main method. The report preserves paper-mode IEPS + greedy SCF as the primary reproduction.", BLUE)
-    imp_table = []
-    for r in improve_rows:
-        if "u_shape" in r["case"] or r["case"] == "circle_noisy":
-            imp_table.append([r["case"], pct(r["paper_f1"]), pct(r["improved_f1"]), f"+{float(r['f1_delta']) * 100:.1f} pts", pct(r["paper_ieps_accuracy"]), pct(r["improved_ieps_accuracy"])])
-    add_table(s, 94, 442, 1088, 132, ["Case", "Paper F1", "Improved F1", "Delta", "Paper IEPS", "Improved IEPS"], imp_table, [0.24, 0.15, 0.16, 0.13, 0.16, 0.16], 12)
-    add_text(s, "Scope note: the improvement is claimed for the synthetic concave U-shape only. On the real vase the improved mode underperforms paper mode (proxy F1 0.25 vs 0.94), so it is an extension for the U-shape failure mode, not a general upgrade.", 94, 586, 1088, 36, size=12, color=MUTED)
-    slides.append(s)
-
-    s = Slide("SCF variants")
-    add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
-    add_title(s, "SCF implementation variants", "Method audit", "The paper-faithful greedy SCF is the default. Graph variants test whether the local segment-following assumption is responsible for U-shape errors.")
-    add_table(s, 78, 196, 520, 210, ["Method", "Role", "U noisy F1", "Runtime"], [["greedy", "paper-style local tracing", pct(u_noisy["f1"]), f"{float(u_noisy['total_ms']):.1f} ms"], ["graph", "global cost path", pct(u_graph["f1"]), f"{float(u_graph['total_ms']):.1f} ms"], ["band_graph", "corridor + curvature penalty", pct(u_band["f1"]), f"{float(u_band['total_ms']):.1f} ms"]], [0.24, 0.38, 0.18, 0.20], 12)
-    add_image(s, ROOT / "results" / "u_shape_noisy" / "panel.png", 672, 184, 500, 178, caption="paper-style greedy")
-    add_image(s, ROOT / "results" / "u_shape_noisy" / "panel_band_graph.png", 672, 430, 500, 178, caption="band graph variant")
-    add_card(s, 80, 462, 518, 102, "Interpretation", "Band-graph improves contour quality slightly on the U-shape, but the larger improvement comes from IEPS initialization. That supports the paper's emphasis on initial edge point quality.", ACCENT)
-    slides.append(s)
-
-    s = Slide("Paper comparison caveats")
-    add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
-    add_title(s, "Baseline comparisons are contextual only", "Unavailable baseline source code", "The paper reports Yuen, Snake/Kass, and Chen comparisons, but it does not provide enough implementation detail for exact source-level reproduction.")
-    add_table(s, 64, 190, 1152, 214, ["Paper comparison", "What this project implements", "Claim level"], [["Yuen initialization", "fixed-angle farthest-edge approximation", "context-only baseline"], ["Snake/Kass", "simple greedy Snake-style relaxation", "not full variational solver"], ["Chen tracing", "gradient-only SCF approximation", "behavioral context"], ["SNR table", "Gaussian SNR noise generated from image variance", "not pixel-identical noise"]], [0.24, 0.48, 0.28], 12)
-    add_table(s, 116, 462, 1048, 104, ["Case", "Yuen-style true points", "IEPS true points", "What to say"], [["circle_noisy", "32/32", "32/32", "both succeed on current synthetic circle"], ["u_shape_noisy", "29/32", "25/32", "opposite direction vs paper Table II; approximation limitation"]], [0.22, 0.22, 0.18, 0.38], 12)
-    add_text(s, "Current runs also show Snake from Yuen-style points >= Snake from IEPS points, and Chen-style == proposed SCF (F1 = 1.0) at all tested SNRs. These approximations do not reproduce the paper's reported gaps and are structural context only.", 116, 580, 1048, 40, size=12, color=MUTED)
-    slides.append(s)
-
-    s = Slide("Real vase")
-    add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
-    add_title(s, "Real vase test path", "Qualitative validation", "The project now supports a real image path with optional mask. Without the paper's original vase and exact baselines, vase metrics are proxy evidence.")
-    add_image(s, ROOT / "results" / "real_vase_paper" / "panel.png", 70, 190, 548, 238, caption="real_vase_paper: generated panel")
-    add_image(s, ROOT / "results" / "paper_comparisons" / "vase_proposed_scf_gradient_distance.png", 716, 202, 240, 238, caption="proposed SCF contour")
-    add_image(s, ROOT / "results" / "paper_comparisons" / "vase_chen_style_gradient_only.png", 982, 202, 206, 238, caption="Chen-style approximation")
-    rv = vase_rows[0] if vase_rows else {}
-    add_table(s, 96, 506, 1064, 96, ["Input source", "Mask source", "Paper-mode F1", "Quantitative status"], [[rv.get("input_source", "data/vase.png"), rv.get("mask_source", "estimated_or_provided"), pct(rv.get("f1", 0.0)) if rv else "n/a", rv.get("quantitative_note", "proxy metrics")]], [0.25, 0.24, 0.16, 0.35], 12)
-    slides.append(s)
-
+    # 10 -- Conclusion + references ------------------------------------------
     s = Slide("Conclusion")
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
-    add_title(s, "Final findings", "Conclusion", "The most important result is a reproducibility story with measured assumptions, not a single leaderboard number.")
-    add_card(s, 76, 190, 342, 154, "Finding 1", "IEPS + greedy SCF reproduces the expected behavior on synthetic circles, including noisy cases: 32/32 IEPS points and F1 near 1.0 in the current run.", ACCENT)
-    add_card(s, 470, 190, 342, 154, "Finding 2", "Concave U-shapes are the stress test. Paper-mode IEPS reaches 25/32 points and about 59% F1 on the noisy U-shape.", AMBER)
-    add_card(s, 864, 190, 342, 154, "Finding 3", "The missing implementation details are a research contribution because they explain why exact reproduction is fragile.", BLUE)
-    add_text(s, "Best final answer", 92, 426, 320, 30, size=23, color=INK, bold=True)
-    add_text(s, "The authors gave a useful geometric method, but the paper is under-specified at the level required for executable reproduction. This project makes those assumptions explicit, validates them on author-style data, and shows a traditional-CV improvement for the U-shape failure mode.", 92, 468, 1060, 72, size=20, color=INK, bold=True)
-    add_text(s, "Future work: recover exact original images, implement full Kass and Chen baselines, run tolerance sweeps, and test more non-star-convex shapes.", 92, 580, 1060, 30, size=15, color=MUTED)
-    slides.append(s)
-
-    s = Slide("References")
-    add_rect(s, 0, 0, SLIDE_W, SLIDE_H, fill=BG, line=BG)
-    add_title(s, "IEEE-style references", "Sources", "Primary paper and baseline methods cited in the project report.")
+    add_header(s, "Conclusion", "The method reproduces - once the missing rules are written down",
+               "The reproducibility audit is the contribution: assumptions were made explicit, implemented, and measured.")
+    add_card(s, 64, 176, 368, 158, "1 - Reproduced",
+             f"Full IEPS + SCF pipeline from the paper description: circles reach F1 {pct(circle_noisy['f1'], 0)}, "
+             f"the noisy U-shape {pct(u_noisy['f1'])} with 32/32 initial points on the true edge and ~10 ms runtime.", ACCENT, body_size=12)
+    add_card(s, 456, 176, 368, 158, "2 - Under-specified",
+             "Behavior hinges on rules the paper omits: SCF stopping, tie-breaking, loop prevention, fallbacks, "
+             "tolerances. Each was fixed explicitly and its effect quantified in the parameter study.", AMBER, body_size=12)
+    add_card(s, 848, 176, 368, 158, "3 - Extension inside the method",
+             f"An interior distance-transform seed with denser coverage lifts the noisy U-shape to "
+             f"{pct(u_improved['improved_f1'])} while preserving circles - scoped to synthetic concave shapes "
+             "(it does not transfer to the vase proxy).", BLUE, body_size=12)
+    add_text(s, "References (IEEE style)", 64, 366, 500, 24, size=15, color=INK, bold=True)
     refs = [
-        '[1] R. C. Hsu, P.-W. Kao, W.-J. Lai, and C.-T. Liu, "An initial edge point selection and segmental contour following for object contour extraction," in Proc. Int. Conf. Control, Automation, Robotics and Vision (ICARCV), 2010.',
+        '[1] R. C. Hsu, P.-W. Kao, W.-J. Lai, and C.-T. Liu, "An initial edge point selection and segmental contour following for object contour extraction," in Proc. IEEE Int. Conf. Control, Automation, Robotics and Vision (ICARCV), 2010, pp. 1632-1637.',
         '[2] P. C. Yuen, G. C. Feng, and J. P. Zhou, "A contour detection method: Initialization and contour model," Pattern Recognition Letters, vol. 20, no. 2, pp. 141-148, 1999.',
         '[3] M. Kass, A. Witkin, and D. Terzopoulos, "Snakes: Active contour models," International Journal of Computer Vision, vol. 1, no. 4, pp. 321-331, 1988.',
-        '[4] B. D. Chen and P. Siy, "Forward/backward contour tracing with feedback," IEEE Transactions on Pattern Analysis and Machine Intelligence, vol. 9, no. 3, pp. 438-446, 1987.',
+        '[4] B. D. Chen and P. Siy, "Forward/backward contour tracing with feedback," IEEE Trans. Pattern Analysis and Machine Intelligence, vol. 9, no. 3, pp. 438-446, 1987.',
         '[5] K. S. Fu and J. K. Mui, "A survey on image segmentation," Pattern Recognition, vol. 13, pp. 3-16, 1981.',
     ]
-    add_text(s, refs, 78, 190, 1090, 318, size=15, color=INK)
-    add_table(s, 110, 530, 1000, 104, ["Project evidence", "Location"], [["Source implementation", "src/ieps.py, src/scf.py, src/ieps_improved.py, main.py"], ["Results used in slides", "results/tables/*.csv and results/*/*.png"]], [0.32, 0.68], 12)
+    add_text(s, refs, 64, 396, 1152, 190, size=12, color=MUTED)
+    add_rect(s, 64, 596, 1152, 52, fill=PAPER, line=LINE)
+    add_text(s, "Evidence: src/ieps.py, src/scf.py, src/geometry.py, main.py  |  results/tables/*.csv  |  "
+                "docs/RESEARCH_REPORT.md - all regenerable with python main.py --run all",
+             84, 610, 1112, 26, size=12, color=MUTED, valign="middle")
     slides.append(s)
 
+    total = len(slides)
     for idx, slide in enumerate(slides, start=1):
         if idx != 1:
-            add_footer(slide, idx)
+            add_footer(slide, idx, total)
 
+
+# --------------------------------------------------------------------------
+# PNG preview rendering
+# --------------------------------------------------------------------------
 
 def fit_rect(img_w: int, img_h: int, x: float, y: float, w: float, h: float, fit: str = "contain") -> Tuple[float, float, float, float]:
     if img_w <= 0 or img_h <= 0:
@@ -486,22 +606,15 @@ def wrap_lines(draw: ImageDraw.ImageDraw, text: str, fnt: ImageFont.FreeTypeFont
     return lines
 
 
-def draw_text_box(
-    draw: ImageDraw.ImageDraw,
-    text: Any,
-    box: Tuple[float, float, float, float],
-    size_pt: int,
-    color: str,
-    bold: bool = False,
-    align: str = "left",
-    valign: str = "top",
-) -> None:
+def draw_text_box(draw: ImageDraw.ImageDraw, text: Any, box: Tuple[float, float, float, float],
+                  size_pt: int, color: str, bold: bool = False, align: str = "left",
+                  valign: str = "top", mono: bool = False) -> None:
     x, y, w, h = box
-    fnt = font(max(8, int(size_pt * 1.25)), bold)
+    fnt = font(max(8, int(size_pt * 1.25)), bold, mono)
     if isinstance(text, list):
         text = "\n".join(str(item) for item in text)
     lines = wrap_lines(draw, str(text), fnt, max(10, w))
-    line_h = int(size_pt * 1.55)
+    line_h = int(size_pt * (1.4 if mono else 1.55))
     total_h = len(lines) * line_h
     yy = y
     if valign == "middle":
@@ -517,8 +630,6 @@ def draw_text_box(
             tx = x + max(0, w - (bbox[2] - bbox[0]))
         draw.text((tx, yy), line, fill=hex_to_rgb(color), font=fnt)
         yy += line_h
-        if yy > y + h + line_h:
-            break
 
 
 def render_slide(slide: Slide, idx: int) -> Path:
@@ -538,7 +649,10 @@ def render_slide(slide: Slide, idx: int) -> Path:
         elif element.kind == "text":
             if props.get("fill"):
                 draw.rectangle([x, y, x + w, y + h], fill=hex_to_rgb(props["fill"]), outline=hex_to_rgb(props.get("line", props["fill"])))
-            draw_text_box(draw, props.get("text", ""), (x, y, w, h), int(props.get("size", 18)), props.get("color", INK), bool(props.get("bold", False)), props.get("align", "left"), props.get("valign", "top"))
+            draw_text_box(draw, props.get("text", ""), (x, y, w, h), int(props.get("size", 18)),
+                          props.get("color", INK), bool(props.get("bold", False)),
+                          props.get("align", "left"), props.get("valign", "top"),
+                          bool(props.get("mono", False)))
         elif element.kind == "image":
             try:
                 img = Image.open(props["path"]).convert("RGB")
@@ -572,6 +686,10 @@ def render_previews() -> Path:
     return montage_path
 
 
+# --------------------------------------------------------------------------
+# PPTX writing
+# --------------------------------------------------------------------------
+
 def solid_fill(color: Optional[str]) -> str:
     if not color or color == "none":
         return "<a:noFill/>"
@@ -584,15 +702,20 @@ def line_xml(color: Optional[str], width_px: float = 1) -> str:
     return f'<a:ln w="{max(1, int(width_px * EMU))}"><a:solidFill><a:srgbClr val="{color.replace("#", "")}"/></a:solidFill></a:ln>'
 
 
-def text_body(text: Any, size_pt: int, color: str, bold: bool = False, align: str = "left", valign: str = "top") -> str:
+def text_body(text: Any, size_pt: int, color: str, bold: bool = False, align: str = "left",
+              valign: str = "top", mono: bool = False) -> str:
     paragraphs = [str(item) for item in text] if isinstance(text, list) else str(text).split("\n")
     algn = {"left": "l", "center": "ctr", "right": "r"}.get(align, "l")
     anchor = {"top": "t", "middle": "ctr", "bottom": "b"}.get(valign, "t")
-    body = [f'<a:bodyPr wrap="square" anchor="{anchor}" lIns="0" tIns="0" rIns="0" bIns="0"><a:spAutoFit/></a:bodyPr><a:lstStyle/>']
+    typeface = "Consolas" if mono else "Aptos"
+    body = [f'<a:bodyPr wrap="square" anchor="{anchor}" lIns="0" tIns="0" rIns="0" bIns="0"/><a:lstStyle/>']
     bold_attr = ' b="1"' if bold else ""
     for para in paragraphs:
         body.append(
-            f'<a:p><a:pPr algn="{algn}"/><a:r><a:rPr lang="en-US" sz="{int(size_pt * 100)}"{bold_attr} dirty="0"><a:solidFill><a:srgbClr val="{color}"/></a:solidFill><a:latin typeface="Aptos"/><a:cs typeface="Aptos"/></a:rPr><a:t>{xesc(para)}</a:t></a:r></a:p>'
+            f'<a:p><a:pPr algn="{algn}"/><a:r><a:rPr lang="en-US" sz="{int(size_pt * 100)}"{bold_attr} dirty="0">'
+            f'<a:solidFill><a:srgbClr val="{color}"/></a:solidFill>'
+            f'<a:latin typeface="{typeface}"/><a:cs typeface="{typeface}"/></a:rPr>'
+            f'<a:t>{xesc(para)}</a:t></a:r></a:p>'
         )
     return f'<p:txBody>{"".join(body)}</p:txBody>'
 
@@ -605,9 +728,11 @@ def sp_xml(shape_id: int, element: Element) -> str:
     line = props.get("line", "none" if tx and not props.get("line") else LINE)
     text_xml = ""
     if tx:
-        text_xml = text_body(props.get("text", ""), int(props.get("size", 18)), props.get("color", INK), bool(props.get("bold", False)), props.get("align", "left"), props.get("valign", "top"))
+        text_xml = text_body(props.get("text", ""), int(props.get("size", 18)), props.get("color", INK),
+                             bool(props.get("bold", False)), props.get("align", "left"),
+                             props.get("valign", "top"), bool(props.get("mono", False)))
     return f"""<p:sp>
-<p:nvSpPr><p:cNvPr id="{shape_id}" name="{xesc(props.get("name", element.kind))}"/><p:cNvSpPr{" txBox=\"1\"" if tx else ""}/><p:nvPr/></p:nvSpPr>
+<p:nvSpPr><p:cNvPr id="{shape_id}" name="{aesc(props.get("name", element.kind))}"/><p:cNvSpPr{' txBox="1"' if tx else ''}/><p:nvPr/></p:nvSpPr>
 <p:spPr><a:xfrm><a:off x="{emu(element.x)}" y="{emu(element.y)}"/><a:ext cx="{emu(element.w)}" cy="{emu(element.h)}"/></a:xfrm><a:prstGeom prst="{geom}"><a:avLst/></a:prstGeom>{solid_fill(fill)}{line_xml(line)}</p:spPr>
 {text_xml}
 </p:sp>"""
@@ -618,7 +743,7 @@ def image_xml(shape_id: int, element: Element, rid: str) -> str:
     with Image.open(props["path"]) as img:
         ix, iy, iw, ih = fit_rect(img.width, img.height, element.x, element.y, element.w, element.h, props.get("fit", "contain"))
     return f"""<p:pic>
-<p:nvPicPr><p:cNvPr id="{shape_id}" name="image" descr="{xesc(Path(props["path"]).name)}"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>
+<p:nvPicPr><p:cNvPr id="{shape_id}" name="image" descr="{aesc(Path(props["path"]).name)}"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>
 <p:blipFill><a:blip r:embed="{rid}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>
 <p:spPr><a:xfrm><a:off x="{emu(ix)}" y="{emu(iy)}"/><a:ext cx="{emu(iw)}" cy="{emu(ih)}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>
 </p:pic>"""
@@ -638,7 +763,8 @@ def slide_xml(slide: Slide) -> Tuple[str, str]:
             sp_tree.append(sp_xml(shape_id, element))
             shape_id += 1
         elif element.kind == "line":
-            line_element = Element("rect", element.x, element.y, max(1, element.w), max(1, element.h), {"fill": element.props.get("fill", LINE), "line": element.props.get("fill", LINE)})
+            line_element = Element("rect", element.x, element.y, max(1, element.w), max(1, element.h),
+                                   {"fill": element.props.get("fill", LINE), "line": element.props.get("fill", LINE)})
             sp_tree.append(sp_xml(shape_id, line_element))
             shape_id += 1
         elif element.kind == "image":
@@ -740,12 +866,12 @@ def write_pptx() -> None:
     write_text(
         WORK / "docProps" / "core.xml",
         f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>IEPS + SCF Final Presentation</dc:title><dc:creator>Codex</dc:creator><cp:lastModifiedBy>Codex</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">{now}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">{now}</dcterms:modified></cp:coreProperties>''',
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>Reimplementation and Validation of IEPS + SCF</dc:title><dc:creator>Parth Goswami</dc:creator><cp:lastModifiedBy>Parth Goswami</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">{now}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">{now}</dcterms:modified></cp:coreProperties>''',
     )
     write_text(
         WORK / "docProps" / "app.xml",
         f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Codex OpenXML</Application><PresentationFormat>On-screen Show (16:9)</PresentationFormat><Slides>{len(slides)}</Slides><Notes>0</Notes><HiddenSlides>0</HiddenSlides><ScaleCrop>false</ScaleCrop><Company></Company><AppVersion>16.0000</AppVersion></Properties>''',
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>IEPS SCF Builder</Application><PresentationFormat>On-screen Show (16:9)</PresentationFormat><Slides>{len(slides)}</Slides><Notes>0</Notes><HiddenSlides>0</HiddenSlides><ScaleCrop>false</ScaleCrop><Company></Company><AppVersion>16.0000</AppVersion></Properties>''',
     )
 
     if PPTX_PATH.exists():

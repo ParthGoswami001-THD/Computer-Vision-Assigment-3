@@ -271,7 +271,11 @@ def add_code(slide: Slide, x: float, y: float, w: float, h: float, lines: List[s
     ty = y + 16
     for raw in lines:
         color = CODE_CMT if raw.lstrip().startswith("#") else CODE_TXT
-        add_text(slide, raw, x + 22, ty, w - 44, pitch + 2, size=size, color=color, mono=True)
+        # Leading spaces survive neither the preview wrapper nor every PPTX
+        # renderer; non-breaking spaces keep the indentation in both.
+        indent = len(raw) - len(raw.lstrip(" "))
+        shown = " " * indent + raw[indent:]
+        add_text(slide, shown, x + 22, ty, w - 44, pitch + 2, size=size, color=color, mono=True)
         ty += pitch
 
 
@@ -530,10 +534,10 @@ def build_slides() -> None:
     add_card(s, 716, 384, 500, 116, "Sensitivity finding",
              "Threshold 40/64/90 and stop tolerance 1-3 px shift F1 by < 0.3 pts - robust. Iteration count dominates: "
              "2 instead of 3 iterations drops F1 by ~13 pts. Point count and placement matter more than tuning.", ACCENT2, body_size=12)
-    add_card(s, 716, 512, 500, 110, "Real vase + honesty notes",
-             f"Real vase (Otsu proxy mask): paper-mode F1 {pct(vase_paper['f1'])} in {ms(vase_paper['total_ms'])}. "
-             "Yuen/Snake/Chen comparisons are labeled approximations; on these synthetic shapes they tie or nearly tie "
-             "(Chen = proposed SCF at every SNR), so they are context, not evidence of the paper's reported gaps.", AMBER, body_size=12)
+    add_card(s, 716, 512, 500, 124, "Real vase + honesty notes",
+             f"Real vase (Otsu proxy mask): paper-mode F1 {pct(vase_paper['f1'])}. Yuen/Snake/Chen comparisons "
+             "are labeled approximations; on these synthetic shapes they tie or nearly tie (Chen = proposed SCF "
+             "at every SNR), so they are context, not evidence of the paper's reported gaps.", AMBER, body_size=12)
     add_text(s, f"Extensions stay inside the authors' method: graph-search SCF {pct(u_graph['f1'])} "
                 f"({ms(u_graph['total_ms'])}) and interior-seed improved IEPS {pct(u_improved['improved_f1'])} on the noisy U-shape.",
              64, 644, 1152, 30, size=13, color=MUTED)
